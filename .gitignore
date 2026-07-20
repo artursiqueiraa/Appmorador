@@ -1,0 +1,34 @@
+# Gitignore raiz do monorepo — cobre o que pode aparecer no nível do
+# workspace inteiro (IDE, OS, segredos). `backend/.gitignore` e
+# `mobile/.gitignore` cobrem o que é específico de cada stack (bin/obj,
+# node_modules, .expo, etc.) — git aplica os dois níveis juntos.
+
+# IDE
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs (nível raiz — cada stack já cobre os próprios logs internos)
+*.log
+logs/
+
+# Banco de dados local (SQL Server/SQLite, caso algum script/ferramenta
+# use no futuro — o projeto usa MySQL, sem arquivo local de banco hoje)
+*.mdf
+*.ldf
+*.db
+*.sqlite
+
+# Ambiente / segredos — nunca versionar, nenhuma exceção
+.env
+.env.*
+!.env.example
+appsettings.Development.local.json
+
+# Backups/duplicatas acidentais (ex.: pasta inteira copiada por engano)
+*_backup_*/

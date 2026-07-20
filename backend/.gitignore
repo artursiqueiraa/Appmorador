@@ -1,0 +1,31 @@
+# .NET build output
+bin/
+obj/
+*.user
+*.suo
+.vs/
+TestResults/
+
+# Nunca commitar credenciais/segredos, mesmo que pareçam "só de dev".
+# Jwt:Key e ConnectionStrings:DefaultConnection ficam em user-secrets
+# (dotnet user-secrets), fora da árvore do repositório — nunca aqui.
+# appsettings.Development.json É versionado (hoje só tem Logging/Cors, sem
+# segredo — necessário para o setup documentado funcionar num clone novo);
+# a convenção "*.local.json"/secrets.json é que existe especificamente para
+# overrides locais que podem conter segredo.
+**/appsettings.Local.json
+**/appsettings.*.local.json
+**/secrets.json
+
+# Snapshots capturados de câmera no disparo de alarme — dado sensível
+# (imagem real de propriedade/residência), nunca deve ser versionado.
+**/snapshots/
+
+# Bancos de teste locais (o projeto usa MySQL; regra preventiva caso algum
+# fluxo de teste use SQLite localmente)
+*.db
+*.sqlite
+
+# OS
+.DS_Store
+Thumbs.db

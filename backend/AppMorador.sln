@@ -1,0 +1,55 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{8A0306FA-D987-465D-9EB7-B84809AD1201}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AppMorador.Domain", "src\AppMorador.Domain\AppMorador.Domain.csproj", "{1DFE724E-819F-4A8E-A1D4-9DD47C5D98E1}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AppMorador.Jfl", "src\AppMorador.Jfl\AppMorador.Jfl.csproj", "{B0D1B815-C8E1-4D2C-9468-C075C85C079E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AppMorador.Infrastructure", "src\AppMorador.Infrastructure\AppMorador.Infrastructure.csproj", "{0A8D1945-22DD-44F0-A454-9DAE47F6F5F3}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AppMorador.Api", "src\AppMorador.Api\AppMorador.Api.csproj", "{737AAD03-29AD-48CB-81E0-6D2355BE10D2}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AppMorador.Application", "src\AppMorador.Application\AppMorador.Application.csproj", "{66D04C6F-8F5B-4469-BCC2-2F1EFAD94690}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{1DFE724E-819F-4A8E-A1D4-9DD47C5D98E1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1DFE724E-819F-4A8E-A1D4-9DD47C5D98E1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1DFE724E-819F-4A8E-A1D4-9DD47C5D98E1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1DFE724E-819F-4A8E-A1D4-9DD47C5D98E1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B0D1B815-C8E1-4D2C-9468-C075C85C079E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B0D1B815-C8E1-4D2C-9468-C075C85C079E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B0D1B815-C8E1-4D2C-9468-C075C85C079E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B0D1B815-C8E1-4D2C-9468-C075C85C079E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0A8D1945-22DD-44F0-A454-9DAE47F6F5F3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0A8D1945-22DD-44F0-A454-9DAE47F6F5F3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0A8D1945-22DD-44F0-A454-9DAE47F6F5F3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0A8D1945-22DD-44F0-A454-9DAE47F6F5F3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{737AAD03-29AD-48CB-81E0-6D2355BE10D2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{737AAD03-29AD-48CB-81E0-6D2355BE10D2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{737AAD03-29AD-48CB-81E0-6D2355BE10D2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{737AAD03-29AD-48CB-81E0-6D2355BE10D2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{66D04C6F-8F5B-4469-BCC2-2F1EFAD94690}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{66D04C6F-8F5B-4469-BCC2-2F1EFAD94690}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{66D04C6F-8F5B-4469-BCC2-2F1EFAD94690}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{66D04C6F-8F5B-4469-BCC2-2F1EFAD94690}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{1DFE724E-819F-4A8E-A1D4-9DD47C5D98E1} = {8A0306FA-D987-465D-9EB7-B84809AD1201}
+		{B0D1B815-C8E1-4D2C-9468-C075C85C079E} = {8A0306FA-D987-465D-9EB7-B84809AD1201}
+		{0A8D1945-22DD-44F0-A454-9DAE47F6F5F3} = {8A0306FA-D987-465D-9EB7-B84809AD1201}
+		{737AAD03-29AD-48CB-81E0-6D2355BE10D2} = {8A0306FA-D987-465D-9EB7-B84809AD1201}
+		{66D04C6F-8F5B-4469-BCC2-2F1EFAD94690} = {8A0306FA-D987-465D-9EB7-B84809AD1201}
+	EndGlobalSection
+EndGlobal
