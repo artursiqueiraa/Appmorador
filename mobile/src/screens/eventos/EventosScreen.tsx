@@ -4,6 +4,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { ChevronLeft, Inbox } from 'lucide-react-native';
 import { useAuth } from '../../auth/AuthContext';
+import { useRealtime } from '../../realtime/RealtimeContext';
 import { api, ApiError } from '../../api/client';
 import type { EventoResponse, EventosPaginadosResponse } from '../../api/types';
 import type { RootStackParamList } from '../../navigation/types';
@@ -23,6 +24,7 @@ const DEBOUNCE_BUSCA_MS = 350;
 export function EventosScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { selectedProperty } = useAuth();
+  const { ultimoEvento } = useRealtime();
 
   const [itens, setItens] = useState<EventoResponse[]>([]);
   const [paginaAtual, setPaginaAtual] = useState(1);
@@ -82,6 +84,26 @@ export function EventosScreen() {
     return () => clearTimeout(timeout);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [periodo, busca]);
+
+  // Sprint 14 (ADR 0017) — um novo evento operacional (ex.: alarme disparado) refaz
+  // só a primeira página, sem perturbar quem já rolou a lista para trás. O payload
+  // do SignalR é só um sinal ("algo novo aconteceu") — a Central de Eventos via GET
+  // continua a fonte de verdade para o conteúdo real, filtros inclusive.
+  const paginaAtualRef = useRef(paginaAtual);
+  useEffect(() => {
+    paginaAtualRef.current = paginaAtual;
+  }, [paginaAtual]);
+
+  useEffect(() => {
+    if (!ultimoEvento || !selectedProperty || ultimoEvento.propriedadeId !== selectedProperty.id) {
+      return;
+    }
+
+    if (paginaAtualRef.current === 1) {
+      buscarPagina(1, 'refresh');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ultimoEvento]);
 
   const handleEndReached = () => {
     if (!loading && !carregandoMais && paginaAtual < totalPaginas) {

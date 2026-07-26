@@ -32,3 +32,14 @@ appsettings.Development.local.json
 
 # Backups/duplicatas acidentais (ex.: pasta inteira copiada por engano)
 *_backup_*/
+
+# Dumps de banco gerados localmente (Sprint 17.5) — schema.sql/seed_data.sql
+# em database/ SÃO versionados (pequenos, diffáveis); dumps completos/pontuais
+# em database/backup/ não são (bloat sem ganho de diff) — o dump oficial da
+# Release 0.9.0 fica anexado como asset binário no GitHub, ver database/README.md
+database/backup/*
+!database/backup/.gitkeep
+
+# Referência/protótipo solto na raiz (imagens e componente de protótipo,
+# não faz parte do código do app — ver docs/AUDITORIA_AMBIENTE.md)
+/ft/

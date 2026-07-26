@@ -17,3 +17,15 @@ public sealed class Result<T>
 
     public static Result<T> Fail(string error) => new() { Success = false, Error = error };
 }
+
+/// <summary>Mesma semantica de <see cref="Result{T}"/> para operacoes sem dado de retorno (ex.: exclusao).</summary>
+public sealed class Result
+{
+    public required bool Success { get; init; }
+
+    public string? Error { get; init; }
+
+    public static Result Ok() => new() { Success = true };
+
+    public static Result Fail(string error) => new() { Success = false, Error = error };
+}

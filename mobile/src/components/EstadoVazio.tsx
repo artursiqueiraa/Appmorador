@@ -2,15 +2,23 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import type { LucideIcon } from 'lucide-react-native';
 import { colors, fontSize, fontWeight, iconSize, radius, spacing } from '../theme/theme';
+import { PrimaryButton } from './PrimaryButton';
 
 interface Props {
   icon: LucideIcon;
   titulo: string;
   descricao: string;
+  /** Sprint 16 (ADR 0019, UX001) — toda lista vazia responde "o que devo fazer agora?" com uma ação, nunca só "0"/"nenhum item". */
+  cta?: { label: string; onPress: () => void };
 }
 
-/** Copy sempre tranquilizadora — nunca linguagem de sistema tipo "0 itens encontrados". */
-export function EstadoVazio({ icon: Icon, titulo, descricao }: Props) {
+/**
+ * Componente "EmptyState" do Design System UX001 — nome mantido em pt-BR
+ * (consistente com o resto do domínio do projeto) desde a Sprint 4. Copy sempre
+ * tranquilizadora e acionável — nunca linguagem de sistema tipo "0 itens
+ * encontrados".
+ */
+export function EstadoVazio({ icon: Icon, titulo, descricao, cta }: Props) {
   return (
     <View style={styles.container}>
       <View style={styles.iconWrap}>
@@ -18,6 +26,11 @@ export function EstadoVazio({ icon: Icon, titulo, descricao }: Props) {
       </View>
       <Text style={styles.titulo}>{titulo}</Text>
       <Text style={styles.descricao}>{descricao}</Text>
+      {cta ? (
+        <View style={styles.ctaWrap}>
+          <PrimaryButton label={cta.label} onPress={cta.onPress} />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -48,4 +61,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: spacing.xs,
   },
+  ctaWrap: { width: '100%', marginTop: spacing.md },
 });

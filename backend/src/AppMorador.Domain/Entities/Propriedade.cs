@@ -1,10 +1,14 @@
+using AppMorador.Domain.Common;
+
 namespace AppMorador.Domain.Entities;
 
 /// <summary>
 /// Uma propriedade (residencia, comercio, escritorio, clinica ou pequeno condominio)
-/// cadastrada por um <see cref="Usuario"/> — o "tenant" do produto.
+/// cadastrada por um <see cref="Usuario"/> — o "tenant" do produto. Agregado raiz de
+/// <see cref="Unidade"/> (Sprint 6) — excluir uma Propriedade exclui logicamente
+/// (nunca fisicamente) todas as Unidades e Moradores dela, ver ADR 0009.
 /// </summary>
-public class Propriedade
+public class Propriedade : EntidadeComSoftDelete
 {
     public Guid Id { get; set; }
 

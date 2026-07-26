@@ -7,16 +7,19 @@ import { colors, fontSize, fontWeight, iconSize, radius, spacing } from '../../t
 
 interface Props {
   evento: EventoResponse;
+  /** Sem borda/fundo próprios — usado quando o item já vive dentro de outro card
+   * (ex.: dentro de um card do Dashboard), para não empilhar "card dentro de card". */
+  compacto?: boolean;
 }
 
-export function ItemEvento({ evento }: Props) {
+export function ItemEvento({ evento, compacto = false }: Props) {
   const cor = evento.destaque ? colors.danger : colors.safe;
   const Icon = evento.destaque ? ShieldAlert : ShieldCheck;
 
   return (
-    <View style={styles.card}>
-      <View style={[styles.iconWrap, { borderColor: cor }]}>
-        <Icon size={iconSize.md} color={cor} />
+    <View style={compacto ? styles.cardCompacto : styles.card}>
+      <View style={styles.iconWrap}>
+        <Icon size={iconSize.sm} color={cor} />
       </View>
       <View style={styles.textWrap}>
         <Text style={styles.titulo}>{evento.titulo}</Text>
@@ -39,13 +42,22 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
     marginBottom: spacing.sm,
   },
+  cardCompacto: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.md,
+    paddingVertical: spacing.xs,
+  },
   iconWrap: {
     width: 38,
     height: 38,
-    borderRadius: 999,
-    borderWidth: 1.5,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface2,
+    borderWidth: 1,
+    borderColor: colors.line,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   textWrap: { flex: 1 },
   titulo: { color: colors.text, fontSize: fontSize.body, fontWeight: fontWeight.medium },

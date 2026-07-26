@@ -1,12 +1,22 @@
 /**
  * Barril do Design System — importa tudo de `tokens.ts` (fonte única de verdade) e
- * reexpõe. `colors`/`spacing`/`radius`/`fontSize`/`fontWeight` são mantidos como
- * nomes de conveniência (compatibilidade com telas já existentes); código novo pode
- * importar `typography`/`motion`/`shadow`/`opacity`/`zIndex`/`iconSize` diretamente.
+ * reexpõe. `colors`/`spacing`/`radius`/`fontSize`/`fontWeight`/`motion` são os nomes
+ * de conveniência usados por todas as telas desde a Sprint 2; `typography`/
+ * `borderRadius`/`animation`/`shadow` são os tokens oficiais do Design System
+ * UX001 (ADR 0019) — código novo deve preferir estes.
  */
-import { colors, radius, spacing, typography, motion, shadow, opacity, zIndex, iconSize } from './tokens';
-
-export const fontSize = typography.fontSize;
-export const fontWeight = typography.fontWeight;
-
-export { colors, radius, spacing, typography, motion, shadow, opacity, zIndex, iconSize };
+export {
+  colors,
+  spacing,
+  radius,
+  borderRadius,
+  typography,
+  fontSize,
+  fontWeight,
+  motion,
+  animation,
+  shadow,
+  opacity,
+  zIndex,
+  iconSize,
+} from './tokens';

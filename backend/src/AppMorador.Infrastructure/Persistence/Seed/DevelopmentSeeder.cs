@@ -135,17 +135,56 @@ public static class DevelopmentSeeder
             })
             .ToList();
 
+        // Sprint 6 — dominio principal (Propriedade > Unidade > Morador): dado real
+        // minimo para o Dashboard nao nascer com "0 unidades, 0 moradores" e o fluxo
+        // criar-propriedade -> criar-unidade -> criar-morador ficar demonstravel sem
+        // cadastro manual antes de qualquer teste.
+        var unidade = new Unidade
+        {
+            Id = Guid.NewGuid(),
+            PropriedadeId = propriedade.Id,
+            Tipo = TipoUnidade.Casa,
+            Identificacao = "Casa principal",
+            CreatedAtUtc = agora,
+        };
+
+        var moradores = new List<Morador>
+        {
+            new()
+            {
+                Id = Guid.NewGuid(),
+                UnidadeId = unidade.Id,
+                Nome = "Fernanda Oliveira",
+                Telefone = "27999990001",
+                Email = EmailMorador,
+                Status = StatusMorador.Ativo,
+                CreatedAtUtc = agora,
+            },
+            new()
+            {
+                Id = Guid.NewGuid(),
+                UnidadeId = unidade.Id,
+                Nome = "Rafael Oliveira",
+                Telefone = "27999990002",
+                Status = StatusMorador.Ativo,
+                Observacoes = "Cônjuge",
+                CreatedAtUtc = agora,
+            },
+        };
+
         db.Usuarios.Add(usuario);
         db.Propriedades.Add(propriedade);
         db.Centrais.Add(central);
         db.Zonas.AddRange(zonaSala, zonaGaragem);
         db.Ocorrencias.AddRange(ocorrencias);
+        db.Unidades.Add(unidade);
+        db.Moradores.AddRange(moradores);
 
         await db.SaveChangesAsync(ct);
 
         logger.LogInformation(
-            "Seed de desenvolvimento: conta Morador criada ({Email} / {Senha}) com 1 propriedade, 1 central, 2 zonas, {QtdOcorrencias} ocorrencias.",
-            EmailMorador, SenhaMorador, ocorrencias.Count);
+            "Seed de desenvolvimento: conta Morador criada ({Email} / {Senha}) com 1 propriedade, 1 central, 2 zonas, {QtdOcorrencias} ocorrencias, 1 unidade, {QtdMoradores} moradores.",
+            EmailMorador, SenhaMorador, ocorrencias.Count, moradores.Count);
         return 1;
     }
 }

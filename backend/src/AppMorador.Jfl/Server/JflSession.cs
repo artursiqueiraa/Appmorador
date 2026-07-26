@@ -99,12 +99,43 @@ public sealed class JflSession : IDisposable
         SendAsync(requisicao.Seq, cmd, dados, cancellationToken);
 
     /// <summary>
+    /// Sprint 12 — Migracao JFL Active 100 Bus: envia um comando iniciado pelo
+    /// servidor (status/armar/desarmar/PGM/inibir zonas) com um SEQ proprio e aguarda
+    /// a resposta correlacionada da central, com timeout. Portado de
+    /// Integra-o-FL-main/SDK/CentralHub.SDK (JflSession.SendAndWaitAsync) — ate a
+    /// Sprint 11 este mecanismo existia so como scaffolding (nunca chamado).
+    /// </summary>
+    public async Task<JflPacket> SendAndWaitAsync(byte cmd, ReadOnlyMemory<byte> dados, TimeSpan timeout, CancellationToken cancellationToken)
+    {
+        var seq = NextSeq();
+        var tcs = new TaskCompletionSource<JflPacket>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        if (!_requisicoesPendentes.TryAdd(seq, tcs))
+        {
+            throw new InvalidOperationException($"Ja existe uma requisicao pendente com SEQ 0x{seq:X2} nesta sessao.");
+        }
+
+        try
+        {
+            await SendAsync(seq, cmd, dados, cancellationToken).ConfigureAwait(false);
+
+            using var timeoutCts = new CancellationTokenSource(timeout);
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+            using var registro = linkedCts.Token.Register(() => tcs.TrySetCanceled(linkedCts.Token));
+
+            return await tcs.Task.ConfigureAwait(false);
+        }
+        finally
+        {
+            _requisicoesPendentes.TryRemove(seq, out _);
+        }
+    }
+
+    /// <summary>
     /// Chamado pelo loop de leitura para cada pacote recebido, antes do dispatch
     /// normal por comando. Retorna <c>true</c> quando o pacote e a resposta de uma
-    /// chamada pendente (nesse caso o chamador nao deve repassar o pacote a nenhum
-    /// <c>IJflCommandHandler</c>). Nesta base (Fase 1) nao ha nenhum comando iniciado
-    /// pelo servidor ainda, entao isto sempre retorna <c>false</c> — mantido para
-    /// compatibilidade futura com comandos do tipo "servidor pergunta, central responde".
+    /// chamada pendente de <see cref="SendAndWaitAsync"/> (nesse caso o chamador nao
+    /// deve repassar o pacote a nenhum <c>IJflCommandHandler</c>).
     /// </summary>
     public bool TryCompletePendingRequest(JflPacket packet)
     {

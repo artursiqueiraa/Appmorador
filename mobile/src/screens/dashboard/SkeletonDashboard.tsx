@@ -17,7 +17,9 @@ export function SkeletonDashboard() {
 
       <Skeleton height={84} radius={radius.xl} style={styles.block} />
       <Skeleton height={120} radius={radius.xl} style={styles.block} />
-      <Skeleton height={72} radius={radius.xl} style={styles.block} />
+      {/* Card de eventos recentes (Sprint 4) — mais alto que um item único, já que
+          agora mostra uma timeline curta em vez de "último evento" sozinho. */}
+      <Skeleton height={148} radius={radius.xl} style={styles.block} />
       <View style={styles.row}>
         <Skeleton height={64} radius={radius.lg} style={{ flex: 1 }} />
         <Skeleton height={64} radius={radius.lg} style={{ flex: 1 }} />

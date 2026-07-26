@@ -26,6 +26,32 @@ internal sealed class JflFonteEventos : IFonteEventos
     public async Task<(IReadOnlyList<EventoTimeline> Itens, int Total)> ConsultarEventosAsync(
         Guid propriedadeId, FiltroEventos filtro, int pagina, int tamanhoPagina, CancellationToken cancellationToken)
     {
+        // Sprint 13 (ADR 0016) — esta fonte representa exclusivamente a central de
+        // alarme JFL: Origem=Jfl, Categoria=Alarme, Fabricante=Jfl sempre. Um filtro
+        // pedindo qualquer outro valor nesses campos nunca pode ser satisfeito por
+        // esta fonte — devolve vazio em vez de ignorar o filtro silenciosamente.
+        if (filtro.Origem is not null && filtro.Origem != OrigemEvento.Jfl)
+        {
+            return (Array.Empty<EventoTimeline>(), 0);
+        }
+
+        if (filtro.Categoria is not null && filtro.Categoria != CategoriaEvento.Alarme)
+        {
+            return (Array.Empty<EventoTimeline>(), 0);
+        }
+
+        if (filtro.Fabricante is not null && filtro.Fabricante != FabricanteEquipamento.Jfl)
+        {
+            return (Array.Empty<EventoTimeline>(), 0);
+        }
+
+        // Severidade nunca e Informativo nesta fonte (so Critico/Atencao, ver mapeamento
+        // abaixo) — pedir Informativo tambem nunca pode ser satisfeito.
+        if (filtro.Severidade == SeveridadeEvento.Informativo)
+        {
+            return (Array.Empty<EventoTimeline>(), 0);
+        }
+
         var query = _db.Ocorrencias.Where(o => o.PropriedadeId == propriedadeId);
 
         if (!string.IsNullOrWhiteSpace(filtro.Busca))
@@ -41,6 +67,34 @@ internal sealed class JflFonteEventos : IFonteEventos
         if (filtro.AteUtc is not null)
         {
             query = query.Where(o => o.CreatedAtUtc <= filtro.AteUtc);
+        }
+
+        if (filtro.Severidade == SeveridadeEvento.Critico)
+        {
+            query = query.Where(o => o.StatusResolucao == StatusResolucao.Resolvido);
+        }
+        else if (filtro.Severidade == SeveridadeEvento.Atencao)
+        {
+            query = query.Where(o => o.StatusResolucao != StatusResolucao.Resolvido);
+        }
+
+        if (filtro.EquipamentoId is not null)
+        {
+            // Auto-vinculo por Numero de Serie (ADR 0015): resolve o Equipamento
+            // (Fabricante=Jfl) pedido e filtra pela Central com o mesmo NumeroSerie —
+            // nunca ha uma FK direta entre EventoEquipamento e Ocorrencia.
+            var equipamento = await _db.Equipamentos
+                .Where(e => e.Id == filtro.EquipamentoId.Value && e.Fabricante == FabricanteEquipamento.Jfl)
+                .Select(e => new { e.Identificador })
+                .FirstOrDefaultAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            if (equipamento?.Identificador is null)
+            {
+                return (Array.Empty<EventoTimeline>(), 0);
+            }
+
+            query = query.Where(o => o.Central != null && o.Central.NumeroSerie == equipamento.Identificador);
         }
 
         var total = await query.CountAsync(cancellationToken).ConfigureAwait(false);

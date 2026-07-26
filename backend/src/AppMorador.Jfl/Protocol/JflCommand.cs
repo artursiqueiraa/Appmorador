@@ -3,10 +3,10 @@ namespace AppMorador.Jfl.Protocol;
 /// <summary>
 /// Bytes de comando (campo CMD) do protocolo 0x7B, conforme documentado para a
 /// Active 100 Bus. Nomeados por secao do documento oficial.
-/// Trimmed para a Fase 1 (confiabilidade do evento): so os comandos efetivamente
-/// tratados (conexao, keep-alive, evento) estao aqui. Os demais (status, armar,
-/// desarmar, PGM, inibir zonas etc.) pertencem a fases futuras e serao adicionados
-/// quando essa funcionalidade for de fato implementada.
+/// Sprint 12 — Migracao JFL Active 100 Bus (ADR 0014/0015): os comandos de
+/// superusuario (status/armar/desarmar/PGM/inibir zonas) foram adicionados,
+/// portados de Integra-o-FL-main/SDK/CentralHub.SDK (namespace original
+/// CentralHub.SDK.Jfl.Protocol) — antes trimmed deliberadamente na Fase 1.
 /// </summary>
 public enum JflCommand : byte
 {
@@ -21,4 +21,28 @@ public enum JflCommand : byte
 
     /// <summary>3.4 - Comando de evento (mandatorio). Enviado pelo equipamento a qualquer momento.</summary>
     Evento = 0x24,
+
+    /// <summary>4.1 - Comando de status como superusuario (tela monitorar).</summary>
+    Status = 0x4D,
+
+    /// <summary>4.2 - Comando de armar como superusuario.</summary>
+    Armar = 0x4E,
+
+    /// <summary>4.3 - Comando de desarmar como superusuario.</summary>
+    Desarmar = 0x4F,
+
+    /// <summary>4.4 - Comando de acionar PGM como superusuario.</summary>
+    AcionarPgm = 0x50,
+
+    /// <summary>4.5 - Comando de desacionar PGM como superusuario.</summary>
+    DesacionarPgm = 0x51,
+
+    /// <summary>4.6 - Comando de inibir zonas como superusuario.</summary>
+    InibirZonas = 0x52,
+
+    /// <summary>4.7 - Comando de armar STAY como superusuario.</summary>
+    ArmarStay = 0x53,
+
+    /// <summary>4.8 - Comando de armar AWAY como superusuario.</summary>
+    ArmarAway = 0x54,
 }

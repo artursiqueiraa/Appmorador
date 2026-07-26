@@ -3,7 +3,9 @@ using System.Text.Json.Serialization;
 using AppMorador.Api;
 using AppMorador.Api.Hosting;
 using AppMorador.Api.Middleware;
+using AppMorador.Api.Realtime;
 using AppMorador.Application.Autenticacao;
+using AppMorador.Application.Operacional;
 using AppMorador.Infrastructure.Identity;
 using AppMorador.Infrastructure.Persistence;
 using AppMorador.Infrastructure.Persistence.Seed;
@@ -11,6 +13,7 @@ using AppMorador.Infrastructure.Snapshots;
 using AppMorador.Jfl;
 using AppMorador.Jfl.Server.Handlers;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -22,6 +25,11 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
+
+// Sprint 11 — protege a senha de Equipamento em repouso (ver ADR 0014). Nome de
+// aplicacao fixo garante que o keyring de cifragem seja o mesmo entre reinicios do
+// processo (sem isso, cada instancia geraria chaves proprias e nada decifraria).
+builder.Services.AddDataProtection().SetApplicationName("AppMorador");
 
 // --- Auth / Propriedade / Dashboard (Sprint 1) -----------------------------------
 // Jwt:Key NUNCA no appsettings.json committado: user-secrets em dev
@@ -61,9 +69,38 @@ builder.Services
             ValidateLifetime = true,
             ClockSkew = TimeSpan.FromSeconds(30),
         };
+
+        // Sprint 14 (ADR 0017) — o handshake de transporte do SignalR (WebSocket) nao
+        // permite cabecalhos customizados como Authorization; o cliente envia o token
+        // via querystring so para as rotas do Hub. Nenhuma outra rota aceita token por
+        // querystring (Controllers continuam exigindo o header Bearer normal).
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+                if (!string.IsNullOrEmpty(accessToken) && context.HttpContext.Request.Path.StartsWithSegments("/hubs"))
+                {
+                    context.Token = accessToken;
+                }
+
+                return Task.CompletedTask;
+            },
+        };
     });
 
 builder.Services.AddAuthorization();
+
+// Sprint 14 (ADR 0017) — camada de transporte da Camada Operacional (ADR 0016) em
+// tempo real. IOperacionalEventoPublicador e Singleton porque so encapsula o
+// IHubContext (ja Singleton) mais um dicionario de debounce compartilhado — nao
+// carrega estado por requisicao.
+// Enums de negocio devem serializar como texto tambem no SignalR (ADR 0005) — o
+// protocolo JSON do Hub tem sua propria configuracao de serializacao, independente
+// de AddControllers().AddJsonOptions() (que so afeta Controllers).
+builder.Services.AddSignalR()
+    .AddJsonProtocol(options => options.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+builder.Services.AddSingleton<IOperacionalEventoPublicador, OperacionalHubPublicador>();
 
 // Rate limit no login/registro — mitiga brute force e cadastro em massa.
 builder.Services.AddRateLimiter(options =>
@@ -73,6 +110,16 @@ builder.Services.AddRateLimiter(options =>
     {
         limiterOptions.Window = TimeSpan.FromMinutes(1);
         limiterOptions.PermitLimit = 10;
+        limiterOptions.QueueLimit = 0;
+    });
+
+    // Sprint 14 — protege o endpoint de negotiate/conexao do OperacionalHub contra
+    // abertura em massa de conexoes; nao limita mensagens dentro de uma conexao ja
+    // aberta (SignalR nao expoe isso via este mecanismo).
+    options.AddFixedWindowLimiter(RateLimiterPolicies.Realtime, limiterOptions =>
+    {
+        limiterOptions.Window = TimeSpan.FromMinutes(1);
+        limiterOptions.PermitLimit = 30;
         limiterOptions.QueueLimit = 0;
     });
 });
@@ -197,6 +244,9 @@ app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+
+// Sprint 14 (ADR 0017) — transporte em tempo real da Camada Operacional (ADR 0016).
+app.MapHub<OperacionalHub>("/hubs/operacional").RequireRateLimiting(RateLimiterPolicies.Realtime);
 
 app.Logger.LogInformation("Sistema pronto.");
 app.Run();

@@ -26,6 +26,18 @@ esta pasta é a única fonte de verdade agora.
 | [0006](0006-modelo-eventos-fontes-plugaveis.md) | Central de Eventos: modelo unificado por fontes plugáveis (IFonteEventos) | 2026-07-19 | Decidido |
 | [0007](0007-squash-migrations-v030-alpha.md) | Squash do histórico de migrations num único InitialCreate (pré-v0.3.0-alpha) | 2026-07-19 | Decidido |
 | [0008](0008-migrations-automaticas-no-startup.md) | Migrations aplicadas automaticamente no startup da Api | 2026-07-20 | Decidido |
+| [0009](0009-soft-delete-dominio-principal.md) | Soft delete como padrão de exclusão no domínio principal (Propriedade/Unidade/Morador) | 2026-07-21 | Decidido |
+| [0010](0010-dominio-controle-acesso.md) | Domínio de Controle de Acesso: Credencial + PermissaoAcesso + PontoAcesso | 2026-07-21 | Decidido |
+| [0011](0011-dominio-visitantes-autorizacoes.md) | Domínio de Visitantes e Autorizações: Visitante na Propriedade + Status híbrido (computado/manual) | 2026-07-21 | Decidido |
+| [0012](0012-dominio-veiculos-garagens.md) | Domínio de Veículos e Garagens: Vaga independente + Status híbrido + PermissaoVeicular reaproveita PontoAcesso | 2026-07-21 | Decidido |
+| [0013](0013-dominio-entregas-correspondencias.md) | Domínio de Entregas e Correspondências: Status 100% manual + visão unificada por Propriedade | 2026-07-22 | Decidido |
+| [0014](0014-provider-integracao-control-id.md) | Arquitetura oficial de integração de fabricante: Provider Control iD (Equipamento + IControlIdProvider) | 2026-07-22 | Decidido |
+| [0015](0015-provider-integracao-jfl-active-100-bus.md) | Migração JFL Active 100 Bus: Provider para protocolo de conexão invertida (IJflProvider + StatusCentralJfl) | 2026-07-22 | Decidido |
+| [0016](0016-camada-operacional-unificada.md) | Camada Operacional Unificada: Estado Bruto → Classificador Operacional → Snapshot Operacional | 2026-07-25 | Decidido |
+| [0017](0017-comunicacao-operacional-tempo-real.md) | Comunicação Operacional em Tempo Real: SignalR como transporte, grupos por Propriedade | 2026-07-25 | Decidido |
+| [0018](0018-prova-extensibilidade-arquitetura.md) | Prova de Extensibilidade da Arquitetura: integração Intelbras sem alterar camadas compartilhadas | 2026-07-25 | Decidido |
+| [0019](0019-ux-first-design-system-mobile-ux001.md) | UX First: Design System Mobile Oficial UX001 — Bottom Nav, HeroCard, vocabulário do morador, onboarding persistente | 2026-07-25 | Decidido |
+| [0020](0020-rbac-ui-local-e-refinamento-experiencia-morador.md) | RBAC de UI Local e Refinamento da Experiência do Morador: perfil local, captura facial sem persistência, Painel de Controle só JFL, erros mapeados centralmente | 2026-07-25 | Decidido |
 
 ## Quando criar uma decisão nova
 

@@ -28,13 +28,28 @@ public sealed class EventosServico : IEventosServico
             return Result<EventosPaginadosResponse>.Fail("Propriedade não encontrada.");
         }
 
-        // Hoje existe uma única fonte registrada (JflFonteEventos). Agregar/paginar entre
-        // múltiplas fontes é lógica que não existe ainda porque não há uma segunda fonte
-        // real para validar contra — fica para quando essa fonte existir de fato.
-        var fonte = _fontes.First();
-        var (itensTimeline, total) = await fonte
-            .ConsultarEventosAsync(propriedadeId, filtro, pagina, tamanhoPagina, cancellationToken)
-            .ConfigureAwait(false);
+        // Sprint 11 — duas fontes reais agora (JflFonteEventos + EquipamentoFonteEventos):
+        // cada fonte devolve seu proprio top-N (N = pagina*tamanhoPagina, sempre ordenado
+        // desc por data), o suficiente para garantir que a pagina pedida do merge esteja
+        // completa. Custo cresce com o numero da pagina — aceitavel na escala atual do
+        // projeto; registrado como limitacao conhecida em DIVIDA_TECNICA.md caso o volume
+        // de eventos cresça. Consultado sequencialmente (nunca Task.WhenAll): as fontes
+        // compartilham a mesma instancia (Scoped) de AppDbContext, que nao e thread-safe
+        // para operacoes concorrentes.
+        var resultadosPorFonte = new List<(IReadOnlyList<EventoTimeline> Itens, int Total)>();
+        foreach (var fonte in _fontes)
+        {
+            resultadosPorFonte.Add(
+                await fonte.ConsultarEventosAsync(propriedadeId, filtro, 1, pagina * tamanhoPagina, cancellationToken).ConfigureAwait(false));
+        }
+
+        var itensTimeline = resultadosPorFonte
+            .SelectMany(r => r.Itens)
+            .OrderByDescending(e => e.OcorridoEmUtc)
+            .Skip((pagina - 1) * tamanhoPagina)
+            .Take(tamanhoPagina)
+            .ToList();
+        var total = resultadosPorFonte.Sum(r => r.Total);
 
         var itens = itensTimeline.Select(ToResponse).ToList();
         var totalPaginas = total == 0 ? 0 : (int)Math.Ceiling(total / (double)tamanhoPagina);

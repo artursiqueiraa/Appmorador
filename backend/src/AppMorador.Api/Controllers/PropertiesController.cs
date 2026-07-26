@@ -42,4 +42,16 @@ public sealed class PropertiesController : ControllerBase
 
         return Ok(result.Data);
     }
+
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await _propriedadeServico.DeleteAsync(User.GetUsuarioId(), id, cancellationToken);
+        if (!result.Success)
+        {
+            return NotFound(new { error = result.Error });
+        }
+
+        return NoContent();
+    }
 }

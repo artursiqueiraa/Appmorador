@@ -1,5 +1,6 @@
 using AppMorador.Api.Auth;
 using AppMorador.Application.Eventos;
+using AppMorador.Domain.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -27,12 +28,27 @@ public sealed class EventosController : ControllerBase
         [FromQuery] string? busca,
         [FromQuery] DateTime? desdeUtc,
         [FromQuery] DateTime? ateUtc,
+        [FromQuery] Guid? equipamentoId,
+        [FromQuery] FabricanteEquipamento? fabricante,
+        [FromQuery] OrigemEvento? origem,
+        [FromQuery] CategoriaEvento? categoria,
+        [FromQuery] SeveridadeEvento? severidade,
         CancellationToken cancellationToken)
     {
         var paginaValida = Math.Max(1, pagina == 0 ? 1 : pagina);
         var tamanhoPaginaValido = Math.Clamp(tamanhoPagina == 0 ? 20 : tamanhoPagina, 1, TamanhoPaginaMaximo);
 
-        var filtro = new FiltroEventos { Busca = busca, DesdeUtc = desdeUtc, AteUtc = ateUtc };
+        var filtro = new FiltroEventos
+        {
+            Busca = busca,
+            DesdeUtc = desdeUtc,
+            AteUtc = ateUtc,
+            EquipamentoId = equipamentoId,
+            Fabricante = fabricante,
+            Origem = origem,
+            Categoria = categoria,
+            Severidade = severidade,
+        };
 
         var result = await _eventosServico.GetEventosAsync(
             User.GetUsuarioId(), propriedadeId, filtro, paginaValida, tamanhoPaginaValido, cancellationToken);

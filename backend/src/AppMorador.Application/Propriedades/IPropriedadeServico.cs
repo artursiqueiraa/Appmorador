@@ -10,4 +10,6 @@ public interface IPropriedadeServico
 
     Task<Result<PropriedadeResponse>> UpdateAsync(
         Guid proprietarioId, Guid propriedadeId, AtualizarPropriedadeRequest request, CancellationToken cancellationToken);
+
+    Task<Result> DeleteAsync(Guid proprietarioId, Guid propriedadeId, CancellationToken cancellationToken);
 }

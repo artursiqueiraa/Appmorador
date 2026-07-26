@@ -1,12 +1,16 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { api } from '../api/client';
+import { api, registerSessionExpiredHandler } from '../api/client';
 import type { EntrarResponse, PropriedadeResponse } from '../api/types';
 import { secureStorage, type StoredUser } from './secureStorage';
+import { obterPerfil, salvarPerfil, type Perfil } from './profilePreference';
 
 interface AuthContextValue {
   isLoading: boolean;
   user: StoredUser | null;
   selectedProperty: PropriedadeResponse | null;
+  /** Sprint 17 (ADR 0020) — preferência local de UI, nunca uma fronteira de segurança real (ver `profilePreference.ts`). */
+  perfil: Perfil;
+  setPerfil: (perfil: Perfil) => void;
   login: (email: string, password: string) => Promise<void>;
   register: (nome: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -19,13 +23,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<StoredUser | null>(null);
   const [selectedProperty, setSelectedProperty] = useState<PropriedadeResponse | null>(null);
+  const [perfil, setPerfilState] = useState<Perfil>('morador');
 
   useEffect(() => {
     (async () => {
       const accessToken = await secureStorage.getAccessToken();
       setUser(accessToken ? await secureStorage.getUser() : null);
+      setPerfilState(await obterPerfil());
       setIsLoading(false);
     })();
+  }, []);
+
+  // Sessão expirada de verdade (refresh token também inválido, ver client.ts) — sem
+  // isso, o app continuaria "logado" em memória numa tela protegida mesmo com a
+  // sessão local já limpa, falhando 401 silenciosamente em toda chamada seguinte.
+  useEffect(() => {
+    registerSessionExpiredHandler(() => {
+      setUser(null);
+      setSelectedProperty(null);
+    });
   }, []);
 
   const login = async (email: string, password: string) => {
@@ -57,9 +73,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const selectProperty = (property: PropriedadeResponse) => setSelectedProperty(property);
 
+  const setPerfil = (novoPerfil: Perfil) => {
+    setPerfilState(novoPerfil);
+    salvarPerfil(novoPerfil);
+  };
+
   const value = useMemo(
-    () => ({ isLoading, user, selectedProperty, login, register, logout, selectProperty }),
-    [isLoading, user, selectedProperty],
+    () => ({ isLoading, user, selectedProperty, perfil, setPerfil, login, register, logout, selectProperty }),
+    [isLoading, user, selectedProperty, perfil],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

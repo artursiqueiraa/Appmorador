@@ -7,10 +7,12 @@ namespace AppMorador.Jfl;
 
 /// <summary>
 /// Registra a infraestrutura de protocolo do servidor JFL (sessao, dispatcher,
-/// handshake, keep-alive) no container de DI. Trimmed para a Fase 1: nao registra
-/// handlers de comandos de negocio (status, armar, PGM, zonas) que nao existem
-/// nesta base ainda — o unico handler de negocio (evento -> Ocorrencia) e
-/// registrado pelo projeto Infrastructure, que tem acesso ao banco.
+/// handshake, keep-alive) no container de DI. O unico handler de negocio ligado a
+/// um comando recebido (evento -> Ocorrencia) e registrado pelo projeto
+/// Infrastructure, que tem acesso ao banco. Sprint 12 — Migracao JFL Active 100 Bus:
+/// os servicos de comando iniciados pelo servidor (status/armar/PGM/inibir zonas)
+/// sao registrados aqui — nao sao <see cref="IJflCommandHandler"/> (nao respondem a
+/// um comando recebido), sao consumidos pelo Provider em Infrastructure/Jfl (ADR 0014).
 /// </summary>
 public static class JflServiceCollectionExtensions
 {
@@ -28,6 +30,11 @@ public static class JflServiceCollectionExtensions
 
         services.AddSingleton<JflCommandDispatcher>();
         services.AddSingleton<JflTcpServer>();
+
+        services.AddSingleton<CentralStatusQueryService>();
+        services.AddSingleton<ArmCommandService>();
+        services.AddSingleton<PgmCommandService>();
+        services.AddSingleton<ZoneInhibitCommandService>();
 
         return services;
     }

@@ -1,3 +1,4 @@
+using AppMorador.Application.Operacional;
 using AppMorador.Domain.ContactId;
 using AppMorador.Domain.Entities;
 using AppMorador.Infrastructure.Persistence;
@@ -29,12 +30,21 @@ public sealed class AlarmEventProcessor
 {
     private readonly AppDbContext _db;
     private readonly SnapshotCaptureService _snapshotCaptureService;
+    private readonly ISnapshotOperacionalServico _snapshotOperacional;
+    private readonly IOperacionalEventoPublicador _publicador;
     private readonly ILogger<AlarmEventProcessor> _logger;
 
-    public AlarmEventProcessor(AppDbContext db, SnapshotCaptureService snapshotCaptureService, ILogger<AlarmEventProcessor> logger)
+    public AlarmEventProcessor(
+        AppDbContext db,
+        SnapshotCaptureService snapshotCaptureService,
+        ISnapshotOperacionalServico snapshotOperacional,
+        IOperacionalEventoPublicador publicador,
+        ILogger<AlarmEventProcessor> logger)
     {
         _db = db;
         _snapshotCaptureService = snapshotCaptureService;
+        _snapshotOperacional = snapshotOperacional;
+        _publicador = publicador;
         _logger = logger;
     }
 
@@ -140,6 +150,15 @@ public sealed class AlarmEventProcessor
             "Ocorrencia {OcorrenciaId} criada (PropriedadeId={PropriedadeId}, ZonaId={ZonaId}, StatusResolucao={StatusResolucao})",
             ocorrencia.Id, ocorrencia.PropriedadeId, ocorrencia.ZonaId, ocorrencia.StatusResolucao);
 
+        // Sprint 14 (ADR 0017) — único gatilho verdadeiramente assíncrono da Camada
+        // Operacional: uma central pode discar este evento a qualquer momento, fora de
+        // qualquer requisição HTTP. So publica quando a Propriedade e conhecida (sem
+        // Central cadastrada nao ha grupo para notificar).
+        if (ocorrencia.PropriedadeId is not null)
+        {
+            await PublicarAtualizacaoOperacionalAsync(ocorrencia, cancellationToken).ConfigureAwait(false);
+        }
+
         // So faz sentido tentar o snapshot quando central e zona foram resolvidos —
         // sem ZonaId nao ha como achar o VinculoZonaCamera, e sem PropriedadeId nao ha
         // onde salvar o arquivo. Ocorrencia.ImagePath fica null nesse caso, sem
@@ -176,6 +195,43 @@ public sealed class AlarmEventProcessor
                 // como erro geral, nem derrubar a Ocorrencia ja persistida.
                 _logger.LogError(ex, "Falha inesperada ao capturar/salvar snapshot para Ocorrencia {OcorrenciaId}", ocorrencia.Id);
             }
+        }
+    }
+
+    private async Task PublicarAtualizacaoOperacionalAsync(Ocorrencia ocorrencia, CancellationToken cancellationToken)
+    {
+        var propriedadeId = ocorrencia.PropriedadeId!.Value;
+
+        try
+        {
+            // Mesmo mapeamento já estabelecido em JflFonteEventos/ADR 0016 (Título via
+            // catálogo Contact ID, Destaque quando resolvido) — não é uma regra nova,
+            // apenas reaplicada aqui no momento da criação do evento, para a notificação
+            // em tempo real (a Central de Eventos via GET continua a fonte de verdade).
+            var titulo = ContactIdCatalog.TryGet(ocorrencia.CodigoEvento, out var definicao)
+                ? definicao!.FriendlyMessage
+                : "Evento registrado";
+
+            var eventoResponse = new AppMorador.Application.Eventos.EventoResponse
+            {
+                Id = ocorrencia.Id,
+                Titulo = titulo,
+                Descricao = null,
+                OcorridoEmUtc = ocorrencia.CreatedAtUtc,
+                Destaque = ocorrencia.StatusResolucao == StatusResolucao.Resolvido,
+            };
+
+            await _publicador.PublicarNovoEventoAsync(propriedadeId, eventoResponse, cancellationToken).ConfigureAwait(false);
+            await _snapshotOperacional
+                .RegenerarEPublicarAsync(propriedadeId, MotivoAtualizacaoOperacional.AlarmeDisparado, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            // Best-effort: a Ocorrencia já foi persistida com sucesso antes desta
+            // chamada — uma falha de notificação em tempo real nunca pode reclassificar
+            // o processamento do evento de alarme como erro.
+            _logger.LogWarning(ex, "Falha ao publicar atualizacao operacional em tempo real apos Ocorrencia {OcorrenciaId}", ocorrencia.Id);
         }
     }
 
