@@ -2,6 +2,40 @@
 
 Registro cronológico das mudanças relevantes do projeto. Cada Sprint/Fase adiciona uma entrada.
 
+## [Sprint 17.5 — Release 0.9.0, Backup, Portabilidade e Disaster Recovery] — 2026-07-25
+
+Objetivo: transformar o AppMorador num projeto reproduzível, documentado, versionado e
+recuperável — zero alteração funcional (domínio/API/integrações/UX intactos). Ver
+`docs/reviews/SPRINT_017_5.md`.
+
+### Adicionado
+- **Auditoria de Ambiente** (`docs/AUDITORIA_AMBIENTE.md`), **Storage** (`docs/STORAGE.md`),
+  **Environment** (`docs/ENVIRONMENT.md` + `backend/.env.example`), **Setup** (`docs/SETUP.md`),
+  **Architecture** (`docs/ARCHITECTURE.md`), **Release 0.9.0** (`docs/RELEASE_0.9.0.md`),
+  **Disaster Recovery** (`docs/DISASTER_RECOVERY.md`, com RTO/RPO e checklist pós-restauração).
+- **Backup de banco** (`database/`: `schema.sql`, `seed_data.sql` versionados; dump completo
+  anexado à Release).
+- **7 scripts PowerShell** (`scripts/`): backup/restore de banco, setup/clean do projeto,
+  start de backend/mobile/frontend (este último documenta a ausência de frontend web).
+- Tag `v0.9.0` e Release do GitHub (commit único consolidando as Sprints 4-17, nunca commitadas
+  desde `v0.3.0-alpha`).
+
+### Corrigido
+- **Bug crítico de versionamento**: `**/snapshots/` no `.gitignore` colidia (Windows,
+  case-insensitive) com os namespaces de código `Snapshots/` de `AppMorador.Domain`/
+  `AppMorador.Infrastructure` — 16 arquivos de integração de câmera nunca haviam sido
+  versionados. Encontrado pela verificação de portabilidade desta própria Sprint (clone limpo
+  falhava o build); corrigido e validado com um segundo clone limpo.
+- `git config core.longpaths` ausente quebrava o checkout de migrations do EF Core em caminhos
+  aninhados no Windows — corrigido em `scripts/setup_project.ps1`.
+- Branch padrão do repositório no GitHub (`release/v0.3.0-alpha` → `main`).
+
+### Pendências registradas
+- Release do GitHub preparada (notas + asset) mas não criada automaticamente — bloqueio do
+  classificador de segurança do ambiente de execução; comando entregue ao usuário.
+- Restauração de banco ponta a ponta contra instância nova não validada nesta sessão (falta
+  usuário MySQL privilegiado) — validação estrutural feita.
+
 ## [Sprint 17 — Refinamento da Experiência do Morador] — 2026-07-25
 
 Objetivo: corrigir 7 fricções encontradas numa validação em dispositivo real sobre a Sprint 16 —

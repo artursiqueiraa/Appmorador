@@ -121,3 +121,22 @@ Ver `docs/ENVIRONMENT.md` para a lista completa e o significado de cada uma.
 3. **Backend não tem log em arquivo** (só console) — se isso for necessário no futuro (ex.:
    ambiente de produção real, não dev local), é uma decisão de arquitetura própria, fora do
    escopo desta Sprint (documentação/portabilidade, zero mudança funcional).
+4. **`git config core.longpaths` não estava habilitado nesta máquina** — nomes de arquivo de
+   migration do EF Core (`*.Designer.cs`) combinados com caminhos de clone razoavelmente
+   aninhados ultrapassam o limite de 260 caracteres do Windows, e o `git checkout` falha com
+   `Filename too long`. Confirmado na verificação de portabilidade (Fase 9) desta Sprint. Corrigido
+   automaticamente por `scripts/setup_project.ps1` (`git config --global core.longpaths true`).
+5. **Bug real e crítico encontrado na verificação de portabilidade (Fase 9)**: a regra
+   `**/snapshots/` do `backend/.gitignore` (destinada só à pasta de runtime de imagens
+   capturadas) colidia, por causa do casamento de padrão sem diferenciar maiúsculas/minúsculas no
+   Windows, com os namespaces de código-fonte `Snapshots/` de `AppMorador.Domain` e
+   `AppMorador.Infrastructure` — **16 arquivos de código real nunca foram versionados**
+   (integração de câmera: `CameraResolver`, providers CGI/ISAPI, `SnapshotCaptureService`, etc.).
+   O build local sempre funcionou (os arquivos existem em disco), mas um clone limpo falhava
+   imediatamente (`error CS0234: The type or namespace name 'Snapshots' does not exist`). Corrigido
+   nesta Sprint: regra reescrita para `src/AppMorador.Api/snapshots/` (escopo específico, sem
+   colisão possível), os 16 arquivos adicionados ao git, tag `v0.9.0` recriada apontando para o
+   commit corrigido. Ver `docs/reviews/SPRINT_017_5.md` para o relato completo.
+6. **Branch padrão do repositório no GitHub era `release/v0.3.0-alpha`**, não `main` — um `git
+   clone` sem especificar branch trazia código de antes da Sprint 4. Corrigido nesta Sprint
+   (`gh repo edit --default-branch main`).

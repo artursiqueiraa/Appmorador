@@ -154,11 +154,26 @@
   conectividade útil, Empty States com CTA em 13 telas, Ajustes reorganizado. Nenhuma alteração em
   backend/domínio/API/integrações/SignalR/ADRs 0014-0019. Ver `docs/reviews/SPRINT_017.md` e ADR
   0020.
+- **Sprint 17.5 — Release 0.9.0, Backup, Portabilidade e Disaster Recovery** — ponto de
+  restauração completo do projeto: auditoria de ambiente, backup/restore de banco (scripts +
+  dumps), inventário de armazenamento, variáveis de ambiente documentadas, 7 scripts PowerShell
+  de automação, documentação de arquitetura/setup/release/disaster recovery, tag `v0.9.0`. A
+  própria verificação de portabilidade (clone real, do zero) encontrou e corrigiu um **bug crítico
+  pré-existente**: 16 arquivos de código-fonte (integração de câmera,
+  `AppMorador.Domain`/`Infrastructure`/`Snapshots/`) nunca haviam sido versionados por uma colisão
+  de padrão no `.gitignore` (case-insensitive no Windows) — invisível em qualquer inspeção do
+  repositório local, só um clone genuinamente limpo revelava. Também corrigidos:
+  `core.longpaths` ausente (quebrava checkout de migrations em caminhos aninhados no Windows) e
+  branch padrão do GitHub apontando para uma release antiga. Zero alteração em
+  domínio/API/integrações/UX. Ver `docs/reviews/SPRINT_017_5.md`.
 
 ## Próximo
 
 - **v0.3.0-alpha**: marco de estabilização atingido na Sprint 3.1 — base executável, previsível e
   documentada para homologação manual.
+- **Release 0.9.0**: ponto de restauração completo atingido na Sprint 17.5 — Release do GitHub
+  preparada, pendente só de o usuário rodar o comando `gh release create` já entregue (bloqueio do
+  classificador de segurança do ambiente de execução, não do processo).
 - **Sprint 18**: aguardando definição de escopo — não iniciar sem autorização explícita.
 
 ## Não iniciado / backlog

@@ -27,7 +27,16 @@ function Test-Ferramenta {
     }
 }
 
-Write-Host "== 1. Verificando ferramentas obrigatorias ==" -ForegroundColor Cyan
+Write-Host "== 0. Configuracao do git (Windows) ==" -ForegroundColor Cyan
+$longPaths = git config --global --get core.longpaths
+if ($longPaths -ne "true") {
+    Write-Host "  Habilitando core.longpaths=true (nomes de arquivo de migration do EF Core passam de 260 caracteres em caminhos aninhados — sem isso, o checkout falha com 'Filename too long', achado real na verificacao de portabilidade da Sprint 17.5)." -ForegroundColor Yellow
+    git config --global core.longpaths true
+} else {
+    Write-Host "  [OK] core.longpaths ja habilitado." -ForegroundColor Green
+}
+
+Write-Host "`n== 1. Verificando ferramentas obrigatorias ==" -ForegroundColor Cyan
 $ok = $true
 $ok = (Test-Ferramenta ".NET SDK" "dotnet" "Instale o .NET 8 SDK: https://dotnet.microsoft.com/download/dotnet/8.0") -and $ok
 $ok = (Test-Ferramenta "Node.js" "node" "Instale Node.js 20+: https://nodejs.org") -and $ok

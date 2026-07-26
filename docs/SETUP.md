@@ -12,6 +12,9 @@ Ver `docs/AUDITORIA_AMBIENTE.md` para a lista completa de versões confirmadas. 
 - MySQL Server 8.0+
 - `dotnet-ef` (`dotnet tool install --global dotnet-ef`)
 - Conta Expo gratuita (só necessária para gerar builds EAS/APK — não para desenvolvimento local)
+- **Windows**: `git config --global core.longpaths true` — sem isso, o clone pode falhar com
+  `Filename too long` nos nomes de migration do EF Core (achado real da Fase 9, ver
+  `docs/AUDITORIA_AMBIENTE.md`). `scripts/setup_project.ps1` já configura isso automaticamente.
 
 ## 1. Clonar o projeto
 

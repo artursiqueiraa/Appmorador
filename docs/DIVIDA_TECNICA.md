@@ -801,3 +801,22 @@ Intelbras (mesmo item 28) ou um conceito de acionamento para Control iD.
 **Sugestão de resolução**: quando essa capacidade existir para outro fabricante, estender a busca
 de `carregarComandosJfl` (`screens/acessos/AccessScreen.tsx`) para incluir também esses
 equipamentos, generalizando o nome da função.
+
+## 37. Sem rotina de backup de banco agendada/automática (Sprint 17.5)
+
+**Descrição**: `scripts/backup_database.ps1` gera um dump completo do banco sob demanda — não há
+nenhum agendamento (Task Scheduler do Windows ou equivalente) rodando isso periodicamente.
+
+**Motivo**: esta Sprint documenta e automatiza o que já existe localmente (ambiente de
+desenvolvimento) — introduzir infraestrutura de agendamento de produção seria escopo novo, fora
+do que foi pedido (backup/portabilidade/disaster recovery de documentação e scripts, não operação
+de produção).
+
+**Impacto**: nenhum hoje (ambiente de desenvolvimento local) — seria relevante para um ambiente de
+produção real com dado de cliente de verdade.
+
+**Prioridade**: média — sobe quando o projeto tiver um ambiente de produção real rodando.
+
+**Sugestão de resolução**: agendar `scripts/backup_database.ps1` via Task Scheduler (Windows) ou
+`cron`/systemd timer (Linux, se o backend for hospedado lá no futuro), com rotação/retenção de
+backups antigos.
