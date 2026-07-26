@@ -17,9 +17,16 @@ TestResults/
 **/appsettings.*.local.json
 **/secrets.json
 
-# Snapshots capturados de câmera no disparo de alarme — dado sensível
-# (imagem real de propriedade/residência), nunca deve ser versionado.
-**/snapshots/
+# Snapshots capturados de câmera no disparo de alarme — dado sensível (imagem
+# real de propriedade/residência), nunca deve ser versionado. Escopado
+# especificamente à pasta de runtime do Api (Snapshots:BasePath em
+# appsettings.json) — nunca usar "**/snapshots/" aqui: no Windows o git casa
+# glob sem diferenciar maiúsculas/minúsculas por padrão, e isso colidia com os
+# NAMESPACES `Snapshots/` de AppMorador.Domain e AppMorador.Infrastructure
+# (código-fonte real, não dado gerado em runtime) — 16 arquivos ficaram
+# silenciosamente fora do git por causa disso até serem encontrados na
+# verificação de portabilidade da Sprint 17.5 (clone limpo falhou o build).
+src/AppMorador.Api/snapshots/
 
 # Bancos de teste locais (o projeto usa MySQL; regra preventiva caso algum
 # fluxo de teste use SQLite localmente)
