@@ -1,4 +1,5 @@
 using AppMorador.Application.Common;
+using AppMorador.Application.Notificacoes;
 using AppMorador.Domain.Entities;
 using AppMorador.Domain.Repositories;
 
@@ -19,19 +20,22 @@ public sealed class EntregaServico : IEntregaServico
     private readonly IMoradorRepositorio _moradores;
     private readonly IEntregaRepositorio _entregas;
     private readonly IHistoricoEntregaRepositorio _historico;
+    private readonly INotificationDispatcher _notificationDispatcher;
 
     public EntregaServico(
         IPropriedadeRepositorio propriedades,
         IUnidadeRepositorio unidades,
         IMoradorRepositorio moradores,
         IEntregaRepositorio entregas,
-        IHistoricoEntregaRepositorio historico)
+        IHistoricoEntregaRepositorio historico,
+        INotificationDispatcher notificationDispatcher)
     {
         _propriedades = propriedades;
         _unidades = unidades;
         _moradores = moradores;
         _entregas = entregas;
         _historico = historico;
+        _notificationDispatcher = notificationDispatcher;
     }
 
     public async Task<Result<EntregaResponse>> CreateAsync(
@@ -179,6 +183,19 @@ public sealed class EntregaServico : IEntregaServico
 
         await RegistrarHistoricoAsync(entrega.Id, tipoEvento, descricaoEvento, proprietarioId, cancellationToken).ConfigureAwait(false);
         await _entregas.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+        if (request.Status == StatusEntrega.DisponivelParaRetirada)
+        {
+            var propriedade = entrega.MoradorDestinatario!.Unidade!.Propriedade!;
+            await _notificationDispatcher.NotificarAsync(
+                EventoNotificacaoTipo.EntregaRecebida,
+                new ContextoNotificacao
+                {
+                    PropriedadeId = propriedade.Id,
+                    NomePropriedade = propriedade.Nome,
+                },
+                cancellationToken).ConfigureAwait(false);
+        }
 
         return Result<EntregaResponse>.Ok(ToDto(entrega, entrega.MoradorDestinatario?.Nome ?? "", entrega.Unidade?.Identificacao ?? ""));
     }

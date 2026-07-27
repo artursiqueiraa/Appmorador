@@ -38,6 +38,14 @@ esta pasta é a única fonte de verdade agora.
 | [0018](0018-prova-extensibilidade-arquitetura.md) | Prova de Extensibilidade da Arquitetura: integração Intelbras sem alterar camadas compartilhadas | 2026-07-25 | Decidido |
 | [0019](0019-ux-first-design-system-mobile-ux001.md) | UX First: Design System Mobile Oficial UX001 — Bottom Nav, HeroCard, vocabulário do morador, onboarding persistente | 2026-07-25 | Decidido |
 | [0020](0020-rbac-ui-local-e-refinamento-experiencia-morador.md) | RBAC de UI Local e Refinamento da Experiência do Morador: perfil local, captura facial sem persistência, Painel de Controle só JFL, erros mapeados centralmente | 2026-07-25 | Decidido |
+| [0022](0022-experiencia-tempo-real.md) | Experiência em Tempo Real: RealtimeContext dividido em 3 (Regra 5), backoff exponencial customizado, Timeline com inserção real e scroll preservado, Painel de Controle com máquina de estados grounded na arquitetura síncrona real | 2026-07-26 | Decidido |
+| [0023](0023-notificacoes-push.md) | Notificações Push: DispositivoPush + INotificationProvider (Firebase, modo sem-op documentado), NotificationDispatcher com hooks diretos na Aplicação, debounce em memória, canais Android, token nativo FCM, deep link com retry de prontidão | 2026-07-26 | Decidido |
+| [0024](0024-visualizacao-cameras.md) | Visualização de Câmeras: evolução da entidade Camera (StatusCamera, dois timestamps), captura sob demanda via ISnapshotCaptureService, imagem servida autenticada com content-type sniffado, evento SignalR leve CameraStatusAlterado, seed com PNG gerado em memória | 2026-07-26 | Decidido |
+| [0021](0021-rbac-master-role-global-vs-perfil-propriedade.md) | RBAC Master: Role Global (interno) vs. Perfil de Propriedade (cliente) — só RBAC de internos implementado, ProprietarioId continua fonte de verdade do cliente, RequireAssertion em vez de AuthorizationHandler, auditoria de falha centralizada | 2026-07-26 | Decidido |
+| [0025](0025-permissoes-funcionais-granulares.md) | Permissões Funcionais Granulares: UsuarioPropriedadePermissao (N:N), Plano Básico automático na criação da Propriedade | 2026-07-26 | Decidido |
+| [0026](0026-feature-flags-por-propriedade.md) | Feature Flags por Propriedade: PropriedadeFeatureFlag ortogonal a Permissão Funcional, consumo do mobile via GET /api/properties enriquecido | 2026-07-26 | Decidido |
+| [0027](0027-modelo-equipamento-capacidades-dinamicas.md) | ModeloEquipamento + Capacidades Dinâmicas: catálogo real substitui Equipamento.Modelo (texto), migration com backfill de dados, resolução transparente sem mudar o contrato da Api | 2026-07-26 | Decidido |
+| [0028](0028-provisionamento-metadados.md) | Provisionamento como Registro de Metadados: árvore completa de vínculos de hardware adiada, escopo reduzido a Nome/Template/Status | 2026-07-26 | Decidido |
 
 ## Quando criar uma decisão nova
 

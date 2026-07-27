@@ -1,8 +1,9 @@
+using AppMorador.Application.Notificacoes;
 using AppMorador.Application.Operacional;
 using AppMorador.Domain.ContactId;
 using AppMorador.Domain.Entities;
+using AppMorador.Domain.Snapshots;
 using AppMorador.Infrastructure.Persistence;
-using AppMorador.Infrastructure.Snapshots;
 using AppMorador.Jfl.Messages;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -29,22 +30,25 @@ namespace AppMorador.Infrastructure.Jfl;
 public sealed class AlarmEventProcessor
 {
     private readonly AppDbContext _db;
-    private readonly SnapshotCaptureService _snapshotCaptureService;
+    private readonly ISnapshotCaptureService _snapshotCaptureService;
     private readonly ISnapshotOperacionalServico _snapshotOperacional;
     private readonly IOperacionalEventoPublicador _publicador;
+    private readonly INotificationDispatcher _notificationDispatcher;
     private readonly ILogger<AlarmEventProcessor> _logger;
 
     public AlarmEventProcessor(
         AppDbContext db,
-        SnapshotCaptureService snapshotCaptureService,
+        ISnapshotCaptureService snapshotCaptureService,
         ISnapshotOperacionalServico snapshotOperacional,
         IOperacionalEventoPublicador publicador,
+        INotificationDispatcher notificationDispatcher,
         ILogger<AlarmEventProcessor> logger)
     {
         _db = db;
         _snapshotCaptureService = snapshotCaptureService;
         _snapshotOperacional = snapshotOperacional;
         _publicador = publicador;
+        _notificationDispatcher = notificationDispatcher;
         _logger = logger;
     }
 
@@ -225,6 +229,21 @@ public sealed class AlarmEventProcessor
             await _snapshotOperacional
                 .RegenerarEPublicarAsync(propriedadeId, MotivoAtualizacaoOperacional.AlarmeDisparado, cancellationToken)
                 .ConfigureAwait(false);
+
+            // Sprint 19 (ADR 0023) — complemento ao SignalR acima: alarme disparado é
+            // "sempre notificar" (Fase 4 da missão), independente de o app estar aberto.
+            var propriedade = await _db.Propriedades
+                .FirstOrDefaultAsync(p => p.Id == propriedadeId, cancellationToken)
+                .ConfigureAwait(false);
+
+            await _notificationDispatcher.NotificarAsync(
+                EventoNotificacaoTipo.AlarmeDisparado,
+                new ContextoNotificacao
+                {
+                    PropriedadeId = propriedadeId,
+                    NomePropriedade = propriedade?.Nome ?? "sua propriedade",
+                },
+                cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex)
         {

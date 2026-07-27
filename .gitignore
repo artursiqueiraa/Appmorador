@@ -17,6 +17,9 @@ Thumbs.db
 *.log
 logs/
 
+# Cobertura de testes (coverlet/jest) — gerado, nunca versionado
+coverage/
+
 # Banco de dados local (SQL Server/SQLite, caso algum script/ferramenta
 # use no futuro — o projeto usa MySQL, sem arquivo local de banco hoje)
 *.mdf
@@ -43,3 +46,13 @@ database/backup/*
 # Referência/protótipo solto na raiz (imagens e componente de protótipo,
 # não faz parte do código do app — ver docs/AUDITORIA_AMBIENTE.md)
 /ft/
+
+# Sprint 19 (ADR 0023) — credenciais reais do Firebase, nunca versionadas em
+# hipótese alguma (nem "isoladas numa pasta", nem gitignored dentro do repo —
+# ver DIVIDA_TECNICA.md/ADR 0023 sobre por que o caminho fica FORA da árvore do
+# projeto por completo, nunca dentro dela mesmo que ignorado). Regra
+# preventiva caso alguém salve um desses arquivos dentro do repo por engano.
+google-services.json
+GoogleService-Info.plist
+*firebase-adminsdk*.json
+*-firebase-adminsdk-*.json

@@ -22,6 +22,47 @@ namespace AppMorador.Infrastructure.Persistence.Migrations
 
             MySqlModelBuilderExtensions.AutoIncrementColumns(modelBuilder);
 
+            modelBuilder.Entity("AppMorador.Domain.Entities.AuditoriaMaster", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("Acao")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<DateTime>("DataHoraUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Detalhes")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("Entidade")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("EntidadeId")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("IpAddress")
+                        .HasColumnType("longtext");
+
+                    b.Property<Guid>("UsuarioId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("UsuarioNome")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DataHoraUtc");
+
+                    b.HasIndex("UsuarioId");
+
+                    b.ToTable("AuditoriaMaster");
+                });
+
             modelBuilder.Entity("AppMorador.Domain.Entities.Autorizacao", b =>
                 {
                     b.Property<Guid>("Id")
@@ -98,6 +139,19 @@ namespace AppMorador.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("PropriedadeId")
                         .HasColumnType("char(36)");
 
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<DateTime?>("UltimaTentativaCapturaUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("UltimoSnapshotPath")
+                        .HasColumnType("longtext");
+
+                    b.Property<DateTime?>("UltimoSucessoCapturaUtc")
+                        .HasColumnType("datetime(6)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("GravadorId");
@@ -168,6 +222,62 @@ namespace AppMorador.Infrastructure.Persistence.Migrations
                     b.HasIndex("MoradorId");
 
                     b.ToTable("Credenciais");
+                });
+
+            modelBuilder.Entity("AppMorador.Domain.Entities.DispositivoPush", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<bool>("Ativo")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Modelo")
+                        .HasColumnType("longtext");
+
+                    b.Property<bool>("NotificarAlertas")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("NotificarAtividades")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("NotificarGeral")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("Plataforma")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<Guid?>("PropriedadeId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<DateTime>("UltimoUsoUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<Guid>("UsuarioId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("VersaoApp")
+                        .HasColumnType("longtext");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PropriedadeId");
+
+                    b.HasIndex("Token")
+                        .IsUnique();
+
+                    b.HasIndex("UsuarioId", "Ativo");
+
+                    b.ToTable("DispositivosPush");
                 });
 
             modelBuilder.Entity("AppMorador.Domain.Entities.Entrega", b =>
@@ -254,8 +364,8 @@ namespace AppMorador.Infrastructure.Persistence.Migrations
                     b.Property<string>("Ip")
                         .HasColumnType("longtext");
 
-                    b.Property<string>("Modelo")
-                        .HasColumnType("longtext");
+                    b.Property<Guid?>("ModeloEquipamentoId")
+                        .HasColumnType("char(36)");
 
                     b.Property<string>("Nome")
                         .IsRequired()
@@ -281,6 +391,8 @@ namespace AppMorador.Infrastructure.Persistence.Migrations
                         .HasColumnType("longtext");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ModeloEquipamentoId");
 
                     b.HasIndex("PropriedadeId");
 
@@ -505,6 +617,52 @@ namespace AppMorador.Infrastructure.Persistence.Migrations
                     b.HasIndex("VisitanteId");
 
                     b.ToTable("HistoricoVisitantes");
+                });
+
+            modelBuilder.Entity("AppMorador.Domain.Entities.ModeloEquipamento", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Fabricante")
+                        .IsRequired()
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<string>("Nome")
+                        .IsRequired()
+                        .HasColumnType("varchar(255)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Fabricante", "Nome")
+                        .IsUnique();
+
+                    b.ToTable("ModelosEquipamento");
+                });
+
+            modelBuilder.Entity("AppMorador.Domain.Entities.ModeloEquipamentoCapacidade", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("Capacidade")
+                        .IsRequired()
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<Guid>("ModeloEquipamentoId")
+                        .HasColumnType("char(36)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ModeloEquipamentoId", "Capacidade")
+                        .IsUnique();
+
+                    b.ToTable("ModelosEquipamentoCapacidade");
                 });
 
             modelBuilder.Entity("AppMorador.Domain.Entities.Morador", b =>
@@ -766,6 +924,67 @@ namespace AppMorador.Infrastructure.Persistence.Migrations
                     b.ToTable("Propriedades");
                 });
 
+            modelBuilder.Entity("AppMorador.Domain.Entities.PropriedadeFeatureFlag", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTime>("AtivadoEmUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<bool>("Ativo")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("Feature")
+                        .IsRequired()
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<Guid>("PropriedadeId")
+                        .HasColumnType("char(36)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PropriedadeId", "Feature")
+                        .IsUnique();
+
+                    b.ToTable("PropriedadesFeatureFlag");
+                });
+
+            modelBuilder.Entity("AppMorador.Domain.Entities.Provisionamento", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTime?>("AtualizadoEmUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Nome")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<Guid>("PropriedadeId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("Template")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PropriedadeId");
+
+                    b.ToTable("Provisionamentos");
+                });
+
             modelBuilder.Entity("AppMorador.Domain.Entities.RefreshToken", b =>
                 {
                     b.Property<Guid>("Id")
@@ -948,6 +1167,9 @@ namespace AppMorador.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("char(36)");
 
+                    b.Property<bool>("Ativo")
+                        .HasColumnType("tinyint(1)");
+
                     b.Property<DateTime?>("BloqueadoAteUtc")
                         .HasColumnType("datetime(6)");
 
@@ -960,6 +1182,9 @@ namespace AppMorador.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Nome")
                         .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("RoleGlobal")
                         .HasColumnType("longtext");
 
                     b.Property<Guid>("SecurityStamp")
@@ -978,6 +1203,59 @@ namespace AppMorador.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("Usuarios");
+                });
+
+            modelBuilder.Entity("AppMorador.Domain.Entities.UsuarioPropriedade", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<bool>("Ativo")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Perfil")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<Guid>("PropriedadeId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<Guid>("UsuarioId")
+                        .HasColumnType("char(36)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PropriedadeId");
+
+                    b.HasIndex("UsuarioId", "PropriedadeId")
+                        .IsUnique();
+
+                    b.ToTable("UsuariosPropriedade");
+                });
+
+            modelBuilder.Entity("AppMorador.Domain.Entities.UsuarioPropriedadePermissao", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("Permissao")
+                        .IsRequired()
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<Guid>("UsuarioPropriedadeId")
+                        .HasColumnType("char(36)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UsuarioPropriedadeId", "Permissao")
+                        .IsUnique();
+
+                    b.ToTable("UsuariosPropriedadePermissao");
                 });
 
             modelBuilder.Entity("AppMorador.Domain.Entities.Vaga", b =>
@@ -1283,6 +1561,24 @@ namespace AppMorador.Infrastructure.Persistence.Migrations
                     b.Navigation("Morador");
                 });
 
+            modelBuilder.Entity("AppMorador.Domain.Entities.DispositivoPush", b =>
+                {
+                    b.HasOne("AppMorador.Domain.Entities.Propriedade", "Propriedade")
+                        .WithMany()
+                        .HasForeignKey("PropriedadeId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("AppMorador.Domain.Entities.Usuario", "Usuario")
+                        .WithMany()
+                        .HasForeignKey("UsuarioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Propriedade");
+
+                    b.Navigation("Usuario");
+                });
+
             modelBuilder.Entity("AppMorador.Domain.Entities.Entrega", b =>
                 {
                     b.HasOne("AppMorador.Domain.Entities.Morador", "MoradorDestinatario")
@@ -1304,11 +1600,18 @@ namespace AppMorador.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("AppMorador.Domain.Entities.Equipamento", b =>
                 {
+                    b.HasOne("AppMorador.Domain.Entities.ModeloEquipamento", "ModeloEquipamento")
+                        .WithMany()
+                        .HasForeignKey("ModeloEquipamentoId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("AppMorador.Domain.Entities.Propriedade", "Propriedade")
                         .WithMany()
                         .HasForeignKey("PropriedadeId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("ModeloEquipamento");
 
                     b.Navigation("Propriedade");
                 });
@@ -1395,6 +1698,17 @@ namespace AppMorador.Infrastructure.Persistence.Migrations
                     b.Navigation("Autorizacao");
 
                     b.Navigation("Visitante");
+                });
+
+            modelBuilder.Entity("AppMorador.Domain.Entities.ModeloEquipamentoCapacidade", b =>
+                {
+                    b.HasOne("AppMorador.Domain.Entities.ModeloEquipamento", "ModeloEquipamento")
+                        .WithMany()
+                        .HasForeignKey("ModeloEquipamentoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ModeloEquipamento");
                 });
 
             modelBuilder.Entity("AppMorador.Domain.Entities.Morador", b =>
@@ -1492,6 +1806,28 @@ namespace AppMorador.Infrastructure.Persistence.Migrations
                     b.Navigation("Proprietario");
                 });
 
+            modelBuilder.Entity("AppMorador.Domain.Entities.PropriedadeFeatureFlag", b =>
+                {
+                    b.HasOne("AppMorador.Domain.Entities.Propriedade", "Propriedade")
+                        .WithMany()
+                        .HasForeignKey("PropriedadeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Propriedade");
+                });
+
+            modelBuilder.Entity("AppMorador.Domain.Entities.Provisionamento", b =>
+                {
+                    b.HasOne("AppMorador.Domain.Entities.Propriedade", "Propriedade")
+                        .WithMany()
+                        .HasForeignKey("PropriedadeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Propriedade");
+                });
+
             modelBuilder.Entity("AppMorador.Domain.Entities.RefreshToken", b =>
                 {
                     b.HasOne("AppMorador.Domain.Entities.Usuario", "Usuario")
@@ -1534,6 +1870,36 @@ namespace AppMorador.Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("Propriedade");
+                });
+
+            modelBuilder.Entity("AppMorador.Domain.Entities.UsuarioPropriedade", b =>
+                {
+                    b.HasOne("AppMorador.Domain.Entities.Propriedade", "Propriedade")
+                        .WithMany()
+                        .HasForeignKey("PropriedadeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("AppMorador.Domain.Entities.Usuario", "Usuario")
+                        .WithMany()
+                        .HasForeignKey("UsuarioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Propriedade");
+
+                    b.Navigation("Usuario");
+                });
+
+            modelBuilder.Entity("AppMorador.Domain.Entities.UsuarioPropriedadePermissao", b =>
+                {
+                    b.HasOne("AppMorador.Domain.Entities.UsuarioPropriedade", "UsuarioPropriedade")
+                        .WithMany()
+                        .HasForeignKey("UsuarioPropriedadeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("UsuarioPropriedade");
                 });
 
             modelBuilder.Entity("AppMorador.Domain.Entities.Vaga", b =>

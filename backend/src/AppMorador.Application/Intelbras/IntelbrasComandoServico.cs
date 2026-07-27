@@ -170,7 +170,7 @@ public sealed class IntelbrasComandoServico : IIntelbrasComandoServico
         EquipamentoId = equipamento.Id,
         PropriedadeId = equipamento.PropriedadeId,
         Nome = equipamento.Nome,
-        Modelo = equipamento.Modelo,
+        Modelo = equipamento.ModeloEquipamento?.Nome,
         Status = equipamento.Status,
         UltimaSincronizacaoUtc = equipamento.UltimaSincronizacaoUtc,
         QuantidadeParticoesArmadas = statusResultante?.Particoes.Count(p => p.Armada),

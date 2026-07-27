@@ -1,18 +1,23 @@
 using System.Text;
 using System.Text.Json.Serialization;
 using AppMorador.Api;
+using AppMorador.Api.Auth;
 using AppMorador.Api.Hosting;
 using AppMorador.Api.Middleware;
 using AppMorador.Api.Realtime;
 using AppMorador.Application.Autenticacao;
 using AppMorador.Application.Operacional;
+using AppMorador.Domain.Entities;
+using AppMorador.Domain.Snapshots;
 using AppMorador.Infrastructure.Identity;
+using AppMorador.Infrastructure.Notifications;
 using AppMorador.Infrastructure.Persistence;
 using AppMorador.Infrastructure.Persistence.Seed;
 using AppMorador.Infrastructure.Snapshots;
 using AppMorador.Jfl;
 using AppMorador.Jfl.Server.Handlers;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
@@ -89,7 +94,32 @@ builder.Services
         };
     });
 
-builder.Services.AddAuthorization();
+// Sprint 21 (ADR 0021) — todas as Policies do sistema, registradas uma única vez
+// aqui. Nunca checar role/claim manualmente dentro de um Controller — sempre via
+// [Authorize(Policy = ...)]. RequireAssertion (em vez de Requirement/Handler
+// próprios por Policy) é uma simplificação deliberada: são checagens de claim
+// simples, e um punhado de classes extras por Policy não traria isolamento real
+// nenhum a mais do que já existe aqui, centralizado num único lugar.
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy(Policies.RequerMaster, p => p.RequireAssertion(ctx => ctx.User.TemAlgumRoleGlobal(RoleSistema.Master)));
+    options.AddPolicy(Policies.RequerTecnico, p => p.RequireAssertion(ctx => ctx.User.TemAlgumRoleGlobal(RoleSistema.Master, RoleSistema.Tecnico)));
+    options.AddPolicy(Policies.RequerSuporte, p => p.RequireAssertion(ctx => ctx.User.TemAlgumRoleGlobal(RoleSistema.Master, RoleSistema.Suporte)));
+    options.AddPolicy(Policies.RequerInterno, p => p.RequireAssertion(ctx => ctx.User.EhInterno()));
+
+    // Sprint 21 — hoje "cliente" == "não é interno" (só Administrador tem login,
+    // ver ADR 0021); RequerAdministrador é o mesmo predicado por ora, mantido como
+    // nome próprio para o dia em que Morador também autenticar.
+    options.AddPolicy(Policies.RequerCliente, p => p.RequireAssertion(ctx => !ctx.User.EhInterno()));
+    options.AddPolicy(Policies.RequerAdministrador, p => p.RequireAssertion(ctx => !ctx.User.EhInterno()));
+
+    // Reservado — nenhum login produz essa claim ainda (ver Policies.RequerMorador).
+    options.AddPolicy(Policies.RequerMorador, p => p.RequireAssertion(ctx => ctx.User.HasClaim("perfilPropriedade", "Morador")));
+});
+
+// Sprint 21 (ADR 0021, Fase 4.2) — auditoria de falha de autorização centralizada,
+// nunca espalhada em cada endpoint.
+builder.Services.AddSingleton<IAuthorizationMiddlewareResultHandler, AuditoriaAuthorizationMiddlewareResultHandler>();
 
 // Sprint 14 (ADR 0017) — camada de transporte da Camada Operacional (ADR 0016) em
 // tempo real. IOperacionalEventoPublicador e Singleton porque so encapsula o
@@ -101,6 +131,11 @@ builder.Services.AddAuthorization();
 builder.Services.AddSignalR()
     .AddJsonProtocol(options => options.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddSingleton<IOperacionalEventoPublicador, OperacionalHubPublicador>();
+
+// Sprint 19 (ADR 0023) — notificacoes push (complemento ao SignalR acima: app
+// aberto usa SignalR, app fechado usa push). Sem Firebase:CredenciaisPath
+// configurado, opera em modo documentado "sem Firebase" (ver FirebaseOptions).
+builder.Services.AddNotificationsModule(builder.Configuration);
 
 // Rate limit no login/registro — mitiga brute force e cadastro em massa.
 builder.Services.AddRateLimiter(options =>
@@ -225,7 +260,8 @@ if (app.Environment.IsDevelopment())
             seedLogger.LogInformation("Executando seed de desenvolvimento...");
             var db = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
             var passwordHasher = seedScope.ServiceProvider.GetRequiredService<IPasswordHasher>();
-            await DevelopmentSeeder.SeedAsync(db, passwordHasher, seedLogger);
+            var snapshotStorage = seedScope.ServiceProvider.GetRequiredService<ISnapshotStorage>();
+            await DevelopmentSeeder.SeedAsync(db, passwordHasher, snapshotStorage, seedLogger);
         }
         catch (Exception ex)
         {

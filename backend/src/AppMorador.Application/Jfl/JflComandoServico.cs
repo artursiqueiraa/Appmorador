@@ -1,4 +1,5 @@
 using AppMorador.Application.Common;
+using AppMorador.Application.Notificacoes;
 using AppMorador.Application.Operacional;
 using AppMorador.Domain.Entities;
 using AppMorador.Domain.Repositories;
@@ -20,19 +21,22 @@ public sealed class JflComandoServico : IJflComandoServico
     private readonly IStatusCentralJflRepositorio _statusCentralJfl;
     private readonly IJflProvider _jflProvider;
     private readonly ISnapshotOperacionalServico _snapshotOperacional;
+    private readonly INotificationDispatcher _notificationDispatcher;
 
     public JflComandoServico(
         IEquipamentoRepositorio equipamentos,
         ICentralRepositorio centrais,
         IStatusCentralJflRepositorio statusCentralJfl,
         IJflProvider jflProvider,
-        ISnapshotOperacionalServico snapshotOperacional)
+        ISnapshotOperacionalServico snapshotOperacional,
+        INotificationDispatcher notificationDispatcher)
     {
         _equipamentos = equipamentos;
         _centrais = centrais;
         _statusCentralJfl = statusCentralJfl;
         _jflProvider = jflProvider;
         _snapshotOperacional = snapshotOperacional;
+        _notificationDispatcher = notificationDispatcher;
     }
 
     public async Task<Result<CentralJflResponse>> ObterDetalhesAsync(Guid proprietarioId, Guid equipamentoId, CancellationToken cancellationToken)
@@ -62,33 +66,39 @@ public sealed class JflComandoServico : IJflComandoServico
 
         var resultado = await _jflProvider.TestarConexaoAsync(equipamento.Identificador!, cancellationToken).ConfigureAwait(false);
 
+        var statusAnterior = equipamento.Status;
         equipamento.Status = resultado.Sucesso ? StatusEquipamento.Online : StatusEquipamento.Offline;
         await _equipamentos.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         await PublicarAtualizacaoAsync(equipamento.PropriedadeId, cancellationToken).ConfigureAwait(false);
+        await NotificarTransicaoOfflineAsync(equipamento, statusAnterior, cancellationToken).ConfigureAwait(false);
 
         return Result<ResultadoTesteConexaoJfl>.Ok(resultado);
     }
 
     public Task<Result<ResultadoComandoJfl>> ConsultarStatusAsync(Guid proprietarioId, Guid equipamentoId, CancellationToken cancellationToken) =>
-        ExecutarComandoAsync(proprietarioId, equipamentoId, (numeroSerie, ct) => _jflProvider.ConsultarStatusAsync(numeroSerie, ct), cancellationToken);
+        ExecutarComandoAsync(proprietarioId, equipamentoId, (numeroSerie, ct) => _jflProvider.ConsultarStatusAsync(numeroSerie, ct), notificarEmSucesso: null, cancellationToken);
 
     public Task<Result<ResultadoComandoJfl>> ArmarAsync(Guid proprietarioId, Guid equipamentoId, int particao, CancellationToken cancellationToken) =>
-        ExecutarComandoAsync(proprietarioId, equipamentoId, (numeroSerie, ct) => _jflProvider.ArmarAsync(numeroSerie, particao, ct), cancellationToken);
+        ExecutarComandoAsync(proprietarioId, equipamentoId, (numeroSerie, ct) => _jflProvider.ArmarAsync(numeroSerie, particao, ct), EventoNotificacaoTipo.SistemaArmado, cancellationToken);
 
     public Task<Result<ResultadoComandoJfl>> DesarmarAsync(Guid proprietarioId, Guid equipamentoId, int particao, CancellationToken cancellationToken) =>
-        ExecutarComandoAsync(proprietarioId, equipamentoId, (numeroSerie, ct) => _jflProvider.DesarmarAsync(numeroSerie, particao, ct), cancellationToken);
+        ExecutarComandoAsync(proprietarioId, equipamentoId, (numeroSerie, ct) => _jflProvider.DesarmarAsync(numeroSerie, particao, ct), EventoNotificacaoTipo.SistemaDesarmado, cancellationToken);
 
     public Task<Result<ResultadoComandoJfl>> ArmarStayAsync(Guid proprietarioId, Guid equipamentoId, int particao, CancellationToken cancellationToken) =>
-        ExecutarComandoAsync(proprietarioId, equipamentoId, (numeroSerie, ct) => _jflProvider.ArmarStayAsync(numeroSerie, particao, ct), cancellationToken);
+        ExecutarComandoAsync(proprietarioId, equipamentoId, (numeroSerie, ct) => _jflProvider.ArmarStayAsync(numeroSerie, particao, ct), EventoNotificacaoTipo.SistemaArmado, cancellationToken);
 
     public Task<Result<ResultadoComandoJfl>> ArmarAwayAsync(Guid proprietarioId, Guid equipamentoId, int particao, CancellationToken cancellationToken) =>
-        ExecutarComandoAsync(proprietarioId, equipamentoId, (numeroSerie, ct) => _jflProvider.ArmarAwayAsync(numeroSerie, particao, ct), cancellationToken);
+        ExecutarComandoAsync(proprietarioId, equipamentoId, (numeroSerie, ct) => _jflProvider.ArmarAwayAsync(numeroSerie, particao, ct), EventoNotificacaoTipo.SistemaArmado, cancellationToken);
 
+    // Sprint 19 — só AcionarPgm (ligar) notifica: é o análogo ao "portão aberto" da
+    // missão (uma ação que acabou de acontecer e é relevante saber). DesligarPgm não
+    // está na tabela de eventos da Fase 4 e normalmente é o próprio morador desfazendo
+    // a própria ação segundos depois — notificar geraria ruído sem trazer novidade.
     public Task<Result<ResultadoComandoJfl>> AcionarPgmAsync(Guid proprietarioId, Guid equipamentoId, int pgmNumero, CancellationToken cancellationToken) =>
-        ExecutarComandoAsync(proprietarioId, equipamentoId, (numeroSerie, ct) => _jflProvider.AcionarPgmAsync(numeroSerie, pgmNumero, ct), cancellationToken);
+        ExecutarComandoAsync(proprietarioId, equipamentoId, (numeroSerie, ct) => _jflProvider.AcionarPgmAsync(numeroSerie, pgmNumero, ct), EventoNotificacaoTipo.ComandoAcionado, cancellationToken);
 
     public Task<Result<ResultadoComandoJfl>> DesligarPgmAsync(Guid proprietarioId, Guid equipamentoId, int pgmNumero, CancellationToken cancellationToken) =>
-        ExecutarComandoAsync(proprietarioId, equipamentoId, (numeroSerie, ct) => _jflProvider.DesligarPgmAsync(numeroSerie, pgmNumero, ct), cancellationToken);
+        ExecutarComandoAsync(proprietarioId, equipamentoId, (numeroSerie, ct) => _jflProvider.DesligarPgmAsync(numeroSerie, pgmNumero, ct), notificarEmSucesso: null, cancellationToken);
 
     public async Task<Result<ResultadoComandoJfl>> InibirZonaAsync(Guid proprietarioId, Guid equipamentoId, int zonaNumero, CancellationToken cancellationToken)
     {
@@ -140,7 +150,8 @@ public sealed class JflComandoServico : IJflComandoServico
     }
 
     private async Task<Result<ResultadoComandoJfl>> ExecutarComandoAsync(
-        Guid proprietarioId, Guid equipamentoId, Func<string, CancellationToken, Task<ResultadoComandoJfl>> executar, CancellationToken cancellationToken)
+        Guid proprietarioId, Guid equipamentoId, Func<string, CancellationToken, Task<ResultadoComandoJfl>> executar,
+        EventoNotificacaoTipo? notificarEmSucesso, CancellationToken cancellationToken)
     {
         var equipamento = await ResolverEquipamentoJflAsync(proprietarioId, equipamentoId, cancellationToken).ConfigureAwait(false);
         if (equipamento is null)
@@ -151,11 +162,21 @@ public sealed class JflComandoServico : IJflComandoServico
         var resultado = await executar(equipamento.Identificador!, cancellationToken).ConfigureAwait(false);
         await AtualizarEquipamentoAposComandoAsync(equipamento, resultado, cancellationToken).ConfigureAwait(false);
 
+        if (notificarEmSucesso is not null && resultado.Sucesso)
+        {
+            await _notificationDispatcher.NotificarAsync(notificarEmSucesso.Value, new ContextoNotificacao
+            {
+                PropriedadeId = equipamento.PropriedadeId,
+                NomePropriedade = equipamento.Propriedade?.Nome ?? "sua propriedade",
+            }, cancellationToken).ConfigureAwait(false);
+        }
+
         return Result<ResultadoComandoJfl>.Ok(resultado);
     }
 
     private async Task AtualizarEquipamentoAposComandoAsync(Equipamento equipamento, ResultadoComandoJfl resultado, CancellationToken cancellationToken)
     {
+        var statusAnterior = equipamento.Status;
         equipamento.Status = resultado.Sucesso ? StatusEquipamento.Online : StatusEquipamento.Offline;
 
         if (resultado.Sucesso && resultado.StatusResultante is not null)
@@ -176,6 +197,27 @@ public sealed class JflComandoServico : IJflComandoServico
         await _equipamentos.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         await _statusCentralJfl.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         await PublicarAtualizacaoAsync(equipamento.PropriedadeId, cancellationToken).ConfigureAwait(false);
+        await NotificarTransicaoOfflineAsync(equipamento, statusAnterior, cancellationToken).ConfigureAwait(false);
+    }
+
+    // Sprint 19 (Fase 4) — só a transição Online/Desconhecido → Offline notifica; a
+    // missão é explícita que "Equipamento online" nunca notifica (não está nem no
+    // enum EventoNotificacaoTipo). Sem isso, toda sincronização bem-sucedida
+    // repetiria "offline" mesmo quando o equipamento já estava offline antes.
+    private Task NotificarTransicaoOfflineAsync(Equipamento equipamento, StatusEquipamento statusAnterior, CancellationToken cancellationToken)
+    {
+        if (statusAnterior == StatusEquipamento.Offline || equipamento.Status != StatusEquipamento.Offline)
+        {
+            return Task.CompletedTask;
+        }
+
+        return _notificationDispatcher.NotificarAsync(EventoNotificacaoTipo.EquipamentoOffline, new ContextoNotificacao
+        {
+            PropriedadeId = equipamento.PropriedadeId,
+            NomePropriedade = equipamento.Propriedade?.Nome ?? "sua propriedade",
+            EquipamentoId = equipamento.Id,
+            NomeEquipamento = equipamento.Nome,
+        }, cancellationToken);
     }
 
     // Sprint 14 (ADR 0017) — cobre os dois pontos que mudam Equipamento.Status/StatusCentralJfl
@@ -203,7 +245,7 @@ public sealed class JflComandoServico : IJflComandoServico
         EquipamentoId = equipamento.Id,
         PropriedadeId = equipamento.PropriedadeId,
         Nome = equipamento.Nome,
-        Modelo = equipamento.Modelo,
+        Modelo = equipamento.ModeloEquipamento?.Nome,
         NumeroSerie = equipamento.Identificador!,
         Status = equipamento.Status,
         UltimaSincronizacaoUtc = equipamento.UltimaSincronizacaoUtc,

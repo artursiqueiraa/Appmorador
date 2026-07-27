@@ -20,6 +20,24 @@ public sealed class PropriedadeServico : IPropriedadeServico
     private readonly IPermissaoVeicularRepositorio _permissoesVeiculares;
     private readonly IEntregaRepositorio _entregas;
     private readonly IEquipamentoRepositorio _equipamentos;
+    private readonly IUsuarioPropriedadeRepositorio _usuariosPropriedade;
+    private readonly IUsuarioPropriedadePermissaoRepositorio _usuariosPropriedadePermissao;
+    private readonly IPropriedadeFeatureFlagRepositorio _features;
+
+    // Sprint 21 (ADR 0021/0025) — "Plano Básico" da missão (Fase — Permissões por
+    // Funcionalidade): concedido automaticamente ao Administrador (dono) na criação
+    // da Propriedade, para nenhuma funcionalidade já esperada pelo morador comum
+    // ficar bloqueada por padrão assim que Permissões Funcionais passarem a ser
+    // checadas por endpoints futuros.
+    private static readonly PermissaoFuncionalidade[] PermissoesPlanoBasico =
+    [
+        PermissaoFuncionalidade.CadastrarMorador,
+        PermissaoFuncionalidade.CadastrarFacial,
+        PermissaoFuncionalidade.CadastrarTag,
+        PermissaoFuncionalidade.AbrirPortao,
+        PermissaoFuncionalidade.VerCameras,
+        PermissaoFuncionalidade.CriarVisitante,
+    ];
 
     public PropriedadeServico(
         IPropriedadeRepositorio propriedades,
@@ -35,7 +53,10 @@ public sealed class PropriedadeServico : IPropriedadeServico
         IVinculoVeiculoVagaRepositorio vinculosVeiculoVaga,
         IPermissaoVeicularRepositorio permissoesVeiculares,
         IEntregaRepositorio entregas,
-        IEquipamentoRepositorio equipamentos)
+        IEquipamentoRepositorio equipamentos,
+        IUsuarioPropriedadeRepositorio usuariosPropriedade,
+        IUsuarioPropriedadePermissaoRepositorio usuariosPropriedadePermissao,
+        IPropriedadeFeatureFlagRepositorio features)
     {
         _propriedades = propriedades;
         _unidades = unidades;
@@ -51,6 +72,9 @@ public sealed class PropriedadeServico : IPropriedadeServico
         _permissoesVeiculares = permissoesVeiculares;
         _entregas = entregas;
         _equipamentos = equipamentos;
+        _usuariosPropriedade = usuariosPropriedade;
+        _usuariosPropriedadePermissao = usuariosPropriedadePermissao;
+        _features = features;
     }
 
     public async Task<PropriedadeResponse> CreateAsync(Guid proprietarioId, CriarPropriedadeRequest request, CancellationToken cancellationToken)
@@ -67,13 +91,74 @@ public sealed class PropriedadeServico : IPropriedadeServico
         await _propriedades.AddAsync(propriedade, cancellationToken).ConfigureAwait(false);
         await _propriedades.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
-        return ToDto(propriedade);
+        // Sprint 21 (ADR 0021) — vínculo Administrador espelhando ProprietarioId
+        // (fonte de verdade continua sendo ProprietarioId nesta Sprint — ver ADR
+        // 0021 para o racional completo de por que os dois coexistem por ora).
+        var vinculo = new UsuarioPropriedade
+        {
+            Id = Guid.NewGuid(),
+            UsuarioId = proprietarioId,
+            PropriedadeId = propriedade.Id,
+            Perfil = PerfilPropriedade.Administrador,
+            CreatedAtUtc = DateTime.UtcNow,
+        };
+        await _usuariosPropriedade.AddAsync(vinculo, cancellationToken).ConfigureAwait(false);
+        await _usuariosPropriedade.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+        await _usuariosPropriedadePermissao.SubstituirAsync(vinculo.Id, PermissoesPlanoBasico, cancellationToken).ConfigureAwait(false);
+        await _usuariosPropriedadePermissao.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+        // Já sabemos exatamente o que foi concedido acima — sem consulta extra.
+        return new PropriedadeResponse
+        {
+            Id = propriedade.Id,
+            Nome = propriedade.Nome,
+            Tipo = propriedade.Tipo,
+            Endereco = propriedade.Endereco,
+            Perfil = PerfilPropriedade.Administrador,
+            Permissoes = PermissoesPlanoBasico,
+            Features = [],
+        };
     }
 
     public async Task<IReadOnlyList<PropriedadeResponse>> ListByOwnerAsync(Guid proprietarioId, CancellationToken cancellationToken)
     {
         var propriedades = await _propriedades.ListByOwnerAsync(proprietarioId, cancellationToken).ConfigureAwait(false);
-        return propriedades.Select(ToDto).ToList();
+        var resultado = new List<PropriedadeResponse>(propriedades.Count);
+        foreach (var propriedade in propriedades)
+        {
+            resultado.Add(await ToDtoEnriquecidoAsync(propriedade, cancellationToken).ConfigureAwait(false));
+        }
+
+        return resultado;
+    }
+
+    /// <summary>
+    /// Sprint 21 (ADR 0021) — o app mobile chama GET /api/properties logo após
+    /// login/troca de propriedade (ver usePermissao) para saber o que mostrar/esconder
+    /// SEM confiar só no papel. Vínculo resolvido por (proprietarioId, propriedadeId) —
+    /// hoje sempre existe (auto-criado em CreateAsync/backfillado no seed), mas se por
+    /// algum motivo não existir, devolve Permissoes vazias (nunca uma exceção) — mais
+    /// seguro exibir "sem permissão" do que travar a lista de propriedades inteira.
+    /// </summary>
+    private async Task<PropriedadeResponse> ToDtoEnriquecidoAsync(Propriedade propriedade, CancellationToken cancellationToken)
+    {
+        var vinculo = await _usuariosPropriedade.GetAsync(propriedade.ProprietarioId, propriedade.Id, cancellationToken).ConfigureAwait(false);
+        var permissoes = vinculo is not null
+            ? await _usuariosPropriedadePermissao.ListAsync(vinculo.Id, cancellationToken).ConfigureAwait(false)
+            : [];
+        var features = await _features.ListAtivasAsync(propriedade.Id, cancellationToken).ConfigureAwait(false);
+
+        return new PropriedadeResponse
+        {
+            Id = propriedade.Id,
+            Nome = propriedade.Nome,
+            Tipo = propriedade.Tipo,
+            Endereco = propriedade.Endereco,
+            Perfil = vinculo?.Perfil ?? PerfilPropriedade.Administrador,
+            Permissoes = permissoes,
+            Features = features,
+        };
     }
 
     public async Task<Result<PropriedadeResponse>> UpdateAsync(

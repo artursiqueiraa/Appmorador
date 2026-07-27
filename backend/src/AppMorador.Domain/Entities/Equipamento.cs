@@ -27,7 +27,15 @@ public class Equipamento : EntidadeComSoftDelete
 
     public required string Nome { get; set; }
 
-    public string? Modelo { get; set; }
+    /// <summary>
+    /// Sprint 21 (ADR 0027) — substitui o antigo campo <c>Modelo</c> (texto livre) por
+    /// uma referência ao catálogo (<see cref="Entities.ModeloEquipamento"/>), de onde
+    /// vêm as capacidades reais do equipamento. Nullable: nem todo equipamento
+    /// cadastrado (inclusive dados anteriores a esta Sprint) tem um modelo resolvido.
+    /// </summary>
+    public Guid? ModeloEquipamentoId { get; set; }
+
+    public ModeloEquipamento? ModeloEquipamento { get; set; }
 
     public required FabricanteEquipamento Fabricante { get; set; }
 

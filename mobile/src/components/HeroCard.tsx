@@ -1,6 +1,6 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
 import { ShieldAlert, ShieldCheck, ShieldOff, Wifi, WifiOff } from 'lucide-react-native';
 import { colors, fontSize, fontWeight, iconSize, motion, radius, spacing } from '../theme/theme';
 
@@ -39,12 +39,20 @@ const VISUAL_CONECTIVIDADE: Record<EstadoConectividade, { cor: string; Icone: ty
  * só quando protegido (indica "vigilância contínua", nunca decorativo); em
  * atenção/desarmado o anel fica parado — a ausência de movimento também comunica
  * algo (sistema não está monitorando ativamente).
+ *
+ * Sprint 18 (ADR 0022, Fase 1) — pulso sutil (scale, ≤300ms) toda vez que o
+ * conteúdo relevante muda (título/subtítulo/conectividade), sinalizando "isto
+ * acabou de atualizar" sem reconstruir o card inteiro. Memoizado (Regra 5): só
+ * re-renderiza quando essas props realmente mudam, nunca por causa de estado de
+ * componentes vizinhos (Timeline, Painel, indicador de conexão).
  */
-export function HeroCard({ status, titulo, subtitulo, conectividade, children }: Props) {
+export const HeroCard = React.memo(function HeroCard({ status, titulo, subtitulo, conectividade, children }: Props) {
   const visual = VISUAL[status];
   const respirando = status === 'protegido';
   const escala = useSharedValue(1);
   const opacidade = useSharedValue(0.5);
+  const escalaAtualizacao = useSharedValue(1);
+  const primeiraRenderizacaoRef = useRef(true);
 
   useEffect(() => {
     if (respirando) {
@@ -56,13 +64,26 @@ export function HeroCard({ status, titulo, subtitulo, conectividade, children }:
     }
   }, [respirando, escala, opacidade]);
 
+  useEffect(() => {
+    if (primeiraRenderizacaoRef.current) {
+      primeiraRenderizacaoRef.current = false;
+      return;
+    }
+    escalaAtualizacao.value = withSequence(withTiming(1.02, { duration: 120 }), withTiming(1, { duration: 150 }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [titulo, subtitulo, conectividade?.label]);
+
   const anelStyle = useAnimatedStyle(() => ({
     transform: [{ scale: escala.value }],
     opacity: opacidade.value,
   }));
 
+  const atualizacaoStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: escalaAtualizacao.value }],
+  }));
+
   return (
-    <View style={[styles.container, { backgroundColor: visual.corDim, borderColor: visual.corLine }]}>
+    <Animated.View style={[styles.container, { backgroundColor: visual.corDim, borderColor: visual.corLine }, atualizacaoStyle]}>
       <View style={styles.iconeWrap}>
         <Animated.View style={[styles.anel, { borderColor: visual.cor }, anelStyle]} />
         <View style={[styles.icone, { backgroundColor: visual.corDim, borderColor: visual.cor }]}>
@@ -83,9 +104,9 @@ export function HeroCard({ status, titulo, subtitulo, conectividade, children }:
           })()
         : null}
       {children ? <View style={styles.acoes}>{children}</View> : null}
-    </View>
+    </Animated.View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   container: {

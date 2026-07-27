@@ -25,5 +25,16 @@ public class Usuario
     /// </summary>
     public Guid SecurityStamp { get; set; } = Guid.NewGuid();
 
+    /// <summary>
+    /// Sprint 21 (ADR 0021) — null para todo cliente (dono de propriedade); só
+    /// preenchido para os 3 papéis internos da plataforma (Master/Tecnico/Suporte).
+    /// Nunca coexiste com um vínculo em <see cref="UsuarioPropriedade"/> — um usuário
+    /// é interno OU cliente, nunca as duas coisas.
+    /// </summary>
+    public RoleSistema? RoleGlobal { get; set; }
+
+    /// <summary>Sprint 21 — desativar uma conta interna (ex.: técnico que saiu da equipe) sem excluir o histórico/auditoria associado.</summary>
+    public bool Ativo { get; set; } = true;
+
     public required DateTime CreatedAtUtc { get; set; }
 }

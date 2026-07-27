@@ -16,10 +16,12 @@ internal sealed class EquipamentoRepositorio : IEquipamentoRepositorio
     public Task<Equipamento?> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
         _db.Equipamentos
             .Include(e => e.Propriedade)
+            .Include(e => e.ModeloEquipamento)
             .FirstOrDefaultAsync(e => e.Id == id, cancellationToken);
 
     public async Task<IReadOnlyList<Equipamento>> ListByPropriedadeAsync(Guid propriedadeId, CancellationToken cancellationToken) =>
         await _db.Equipamentos
+            .Include(e => e.ModeloEquipamento)
             .Where(e => e.PropriedadeId == propriedadeId)
             .OrderBy(e => e.Nome)
             .ToListAsync(cancellationToken)

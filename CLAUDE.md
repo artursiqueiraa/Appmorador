@@ -55,6 +55,20 @@ afetados pela tarefa atual, combinando com os agentes já selecionados. Regras n
 agentes nem vice-versa — agentes definem *quem decide*, regras definem *o que não pode ser
 violado*.
 
+## Regra de Validação em Dispositivo (Obrigatória, desde a Sprint 20)
+
+Toda Sprint que alterar o aplicativo mobile (interface, navegação, autenticação, integrações,
+tempo real, notificações, formulários ou qualquer fluxo do usuário) só é considerada entregue após
+5 etapas: **Implementação → Testes Automatizados (`dotnet test`/`jest`/`typecheck`/`lint`/
+`expo-doctor`) → APK Preview (EAS, `--profile preview`) → Homologação Manual em dispositivo físico
+Android (link do build + Build ID + checklist específico da Sprint + regressão obrigatória:
+login/logout/troca de propriedade/Dashboard/Acessos/Push/SignalR) → Reviewer (todos os pilares)**.
+Resultado da homologação (Aprovada/Reprovada, com severidade dos bugs) e o histórico ficam em
+`docs/testing/SprintXX.md`. Bug **Blocker** impede encerrar a Sprint; **High** só encerra com aceite
+explícito do usuário; **Medium**/**Low** viram backlog e não bloqueiam. Exceção: dispensável só em
+Sprints exclusivamente de backend/documentação/infraestrutura que não alterem o comportamento do
+app mobile.
+
 ## Fluxo oficial de desenvolvimento
 
 1. Identificar a tarefa.

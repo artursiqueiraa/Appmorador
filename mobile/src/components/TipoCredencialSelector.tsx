@@ -21,15 +21,19 @@ interface Props {
   label: string;
   value: TipoCredencial | null;
   onChange: (valor: TipoCredencial) => void;
+  /** Sprint 21 (ADR 0025) — se informado, só estes tipos aparecem (ex.: esconder "Facial"/"Tag RFID" sem a Permissão Funcional correspondente). Omitido = todos os tipos (comportamento anterior, sem regressão). */
+  permitidos?: TipoCredencial[];
 }
 
 /** Mesmo padrão visual de `TipoUnidadeSelector` — chips de seleção única. */
-export function TipoCredencialSelector({ label, value, onChange }: Props) {
+export function TipoCredencialSelector({ label, value, onChange, permitidos }: Props) {
+  const opcoesVisiveis = permitidos ? OPCOES.filter((o) => permitidos.includes(o.valor)) : OPCOES;
+
   return (
     <View style={styles.container}>
       <Text style={styles.label}>{label}</Text>
       <View style={styles.chipsRow}>
-        {OPCOES.map((opcao) => {
+        {opcoesVisiveis.map((opcao) => {
           const ativo = opcao.valor === value;
           return (
             <Pressable

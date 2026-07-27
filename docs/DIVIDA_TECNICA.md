@@ -820,3 +820,135 @@ produção real com dado de cliente de verdade.
 **Sugestão de resolução**: agendar `scripts/backup_database.ps1` via Task Scheduler (Windows) ou
 `cron`/systemd timer (Linux, se o backend for hospedado lá no futuro), com rotação/retenção de
 backups antigos.
+
+## 38. Push real ainda não validado ponta a ponta — sem credenciais Firebase reais (Sprint 19)
+
+**Descrição**: `FirebaseNotificationProvider` opera em modo "sem-op documentado"
+(`FirebaseOptions.Configurado == false`) — loga o que enviaria e retorna sucesso simulado, nunca
+chama a API real do FCM. O Mobile obtém um token nativo (`getDevicePushTokenAsync`) mesmo sem
+`google-services.json` real, mas esse token não corresponde a nenhum projeto Firebase de verdade.
+
+**Motivo**: criar um projeto Firebase real e obter as credenciais (conta de serviço para o backend,
+`google-services.json` para o app) exige acesso ao Firebase Console, indisponível nesta sessão —
+decisão explícita do usuário (perguntado antes de qualquer código) foi construir a arquitetura real
+completa com esse modo sem-op, em vez de não entregar nada.
+
+**Impacto**: nenhuma notificação chega de verdade a um dispositivo físico hoje. Toda a lógica
+(decisão de notificar, mensagem, canal, debounce, ciclo de vida do token) está implementada e
+testada, só o envio real depende de configuração externa.
+
+**Prioridade**: alta — sobe assim que o usuário tiver acesso a um projeto Firebase real.
+
+**Sugestão de resolução**: criar o projeto no Firebase Console, gerar a credencial de conta de
+serviço (colocar o caminho em `Firebase:CredenciaisPath`, `appsettings.json`), adicionar o app
+Android e baixar `google-services.json` para o build do Expo (`android.googleServicesFile` no
+`app.json`), gerar um novo build EAS e validar em um dispositivo físico.
+
+## 39. iOS não implementado/validado (Fase 3, Sprint 19)
+
+**Descrição**: só Android foi implementado e (parcialmente, ver item 38) preparado para validação
+nesta Sprint. `DispositivoPush.Plataforma` já suporta `Ios`, mas nenhum certificado APNs foi
+configurado e não há dispositivo iOS físico neste ambiente para testar.
+
+**Motivo**: previsto explicitamente pela própria missão da Sprint 19 ("se não houver dispositivo
+iOS físico, documentar como dívida técnica e validar apenas Android").
+
+**Impacto**: nenhum morador com iPhone recebe push nesta versão.
+
+**Prioridade**: média — sobe quando houver um dispositivo iOS físico disponível para validação.
+
+**Sugestão de resolução**: registrar App ID com push capability, gerar certificado/chave APNs,
+configurar no Firebase (FCM pode usar APNs como transporte) e validar em dispositivo físico.
+
+## 40. Agrupamento de notificações (Fase 8.1) não implementado (Sprint 19)
+
+**Descrição**: só o limite de frequência (debounce, Fase 8.2) foi implementado. Múltiplas
+notificações do mesmo tipo em sequência não são agrupadas numa única mensagem ("3 novas atividades
+em Casa Serra").
+
+**Motivo**: o debounce de 60s já evita a maior parte do ruído prático (mesmo evento/equipamento
+repetido); implementar agregação por janela de tempo sem um caso de uso real pressionando por isso
+seria abstração especulativa.
+
+**Impacto**: baixo — em uso normal, eventos de tipos diferentes chegam como notificações
+separadas, o que já é aceitável.
+
+**Prioridade**: baixa — sobe se o volume real de notificações em produção se mostrar incômodo.
+
+**Sugestão de resolução**: agregar por `(EventoNotificacaoTipo, PropriedadeId)` numa janela curta
+(ex.: 2 minutos) antes de enviar, com uma mensagem consolidada quando há mais de uma ocorrência.
+
+## 41. Debounce em memória não sobrevive a múltiplas instâncias de backend (Sprint 19)
+
+**Descrição**: `DebounceNotificacaoEmMemoria` usa um `ConcurrentDictionary` local ao processo — se
+o backend rodar mais de uma instância (load balancer, múltiplos containers), cada instância tem seu
+próprio estado de debounce, permitindo notificações duplicadas.
+
+**Motivo**: continuação deliberada da filosofia de simplicidade do projeto — sem Redis/fila
+antecipados sem necessidade real (mesmo racional de Sprints anteriores). Hoje o backend roda como
+processo único.
+
+**Impacto**: nenhum hoje. Só se manifesta se/quando o backend escalar horizontalmente.
+
+**Prioridade**: baixa — sobe junto com qualquer decisão futura de escalar o backend
+horizontalmente.
+
+**Sugestão de resolução**: substituir por um cache distribuído (Redis) com a mesma interface
+`IDebounceNotificacao`, sem mudar `NotificationDispatcher`.
+
+## 42. Preferências de canal de notificação espelhadas localmente, sem `GET` no backend (Sprint 19)
+
+**Descrição**: a tela Ajustes → Notificações lê o estado inicial dos 3 toggles de um espelho local
+(`pushDeviceStorage`), não de um `GET /api/dispositivos-push/{id}` (que não existe — não foi pedido
+pela missão). Se o mesmo dispositivo tiver suas preferências alteradas por outro caminho (ex.:
+diretamente no banco), o Mobile não perceberia até a próxima alteração feita pela própria tela.
+
+**Motivo**: criar um endpoint `GET` novo não solicitado seria escopo além do pedido; o servidor
+continua sendo a fonte de verdade para o ENVIO (o espelho local é só para renderizar o toggle).
+
+**Impacto**: baixo — cenário de divergência exigiria uma alteração fora do fluxo normal do app.
+
+**Prioridade**: baixa.
+
+**Sugestão de resolução**: adicionar `GET /api/dispositivos-push/{id}` quando houver necessidade
+real de sincronizar preferências entre múltiplos pontos de escrita.
+
+## 43. Detecção de movimento não implementada — nenhum gravador emite esse sinal (Sprint 20)
+
+**Descrição**: a missão da Sprint 20 pedia um badge "Movimento detectado" (Fase 5/7) quando o
+gravador suportasse. Nenhum `ISnapshotProvider` (Dahua/Intelbras CGI, Hikvision ISAPI) hoje expõe
+webhook, polling ou qualquer sinal de detecção de movimento — só captura de snapshot sob demanda.
+
+**Motivo**: implementar o badge exigiria fabricar um evento que não existe de verdade —
+contrariaria a mesma disciplina já aplicada em Sprints anteriores (nunca simular uma capacidade de
+hardware sem uma fonte real por trás, ver Sprint 3/ADR 0006 sobre a decisão equivalente para
+controle de acesso).
+
+**Impacto**: nenhum hoje — o recurso simplesmente não existe em nenhum lugar do sistema.
+
+**Prioridade**: baixa — sobe se um gravador com essa capacidade real (webhook de movimento) for
+integrado no futuro.
+
+**Sugestão de resolução**: quando um fabricante com suporte real a movimento for integrado,
+adicionar um novo `IMotionEventProvider` (ou estender `ISnapshotProvider`) e publicar via
+`IOperacionalEventoPublicador`, mesmo padrão de `CameraStatusAlterado`.
+
+## 44. Arquivo de snapshot do seed salvo com extensão `.jpg` contendo bytes PNG (Sprint 20)
+
+**Descrição**: `SnapshotStorage.SaveAsync` sempre nomeia o arquivo como `{guid}.jpg` (convenção
+usada desde a Fase 2 do projeto, pré-Sprint 1) — o seed de desenvolvimento (`DevelopmentSeeder`)
+grava bytes PNG reais (`PlaceholderImageGenerator`) nesse mesmo caminho, resultando num arquivo
+com extensão `.jpg` mas conteúdo PNG.
+
+**Motivo**: mudar a assinatura de `ISnapshotStorage.SaveAsync` para aceitar uma extensão/
+content-type customizado afetaria o caminho de captura real (sempre JPEG) sem necessidade —
+inofensivo porque `GET /api/cameras/{id}/imagem` sempre sniffa o Content-Type pela assinatura do
+arquivo (primeiros bytes), nunca pela extensão do nome (ver ADR 0024 Decisão 3).
+
+**Impacto**: nenhum funcional — só uma inconsistência cosmética visível a quem inspecionar a
+pasta `snapshots/` manualmente.
+
+**Prioridade**: baixa.
+
+**Sugestão de resolução**: se algum dia importar, estender `ISnapshotStorage.SaveAsync` para
+aceitar uma extensão explícita, ou gerar o placeholder do seed como JPEG de verdade.

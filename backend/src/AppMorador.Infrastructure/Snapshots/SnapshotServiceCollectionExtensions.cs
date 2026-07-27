@@ -23,7 +23,7 @@ public static class SnapshotServiceCollectionExtensions
         services.AddSingleton<ISnapshotProvider, IntelbrasCgiSnapshotProvider>();
         services.AddSingleton<ISnapshotProvider, HikvisionIsapiSnapshotProvider>();
         services.AddScoped<ICameraResolver, CameraResolver>();
-        services.AddScoped<SnapshotCaptureService>();
+        services.AddScoped<ISnapshotCaptureService, SnapshotCaptureService>();
 
         return services;
     }

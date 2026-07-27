@@ -66,6 +66,9 @@ public sealed class EquipamentoResponse
 
     public string? Modelo { get; init; }
 
+    /// <summary>Sprint 21 (ADR 0027) — id do catálogo, para quem quiser consultar capacidades via GET /api/equipamentos/{id}/capacidades.</summary>
+    public Guid? ModeloEquipamentoId { get; init; }
+
     public required FabricanteEquipamento Fabricante { get; init; }
 
     public string? Ip { get; init; }

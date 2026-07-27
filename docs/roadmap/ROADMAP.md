@@ -166,6 +166,62 @@
   `core.longpaths` ausente (quebrava checkout de migrations em caminhos aninhados no Windows) e
   branch padrão do GitHub apontando para uma release antiga. Zero alteração em
   domínio/API/integrações/UX. Ver `docs/reviews/SPRINT_017_5.md`.
+- **Sprint 18 — Experiência em Tempo Real** — RealtimeContext dividido em 3 (Regra 5: cada
+  consumidor só re-renderiza pelo que usa); Timeline com inserção real de eventos (Fade+Slide,
+  scroll preservado, badge "Novo", cache máximo 50); Toasts inteligentes (só fora da tela onde o
+  evento já é visível, via rastreamento de tela em foco); Painel de Controle com máquina de
+  estados de comando (Normal/Enviando/Sucesso/Falha, timeout 10s) e status Online/Offline ao vivo;
+  reconexão com backoff exponencial customizado (1s/2s/5s/10s/30s) + "Tentar novamente" manual;
+  cache descartado corretamente na troca de propriedade (achado real: telas guardavam estado local
+  próprio que não era limpo). Achado arquitetural: comandos JFL são síncronos (sem canal de
+  confirmação assíncrona via SignalR) — a máquina de estados foi desenhada para essa realidade, não
+  para uma suposta assíncrona que não existe. Zero alteração em domínio/API/integrações/arquitetura
+  de backend. Ver `docs/reviews/SPRINT_018.md` e ADR 0022.
+- **Sprint 18.1 — Hotfix: Correções Críticas de UX e Estabilidade** — bugs críticos da validação
+  em dispositivo físico da Sprint 18 corrigidos: causa raiz real de "propriedades não carregam" e
+  "não sai da conta" era `fetch` sem timeout (backend inalcançável travava a requisição para
+  sempre) — corrigido com timeout de 15s; logout agora sempre limpa a sessão local (`finally`);
+  `SafeAreaProvider` adicionado globalmente (faltava em toda a árvore, só `BottomNavigation.tsx`
+  usava safe area); "Suas propriedades" ganhou máquina de estados de carregamento (Skeleton/Erro/
+  Sucesso) que não existia. Infraestrutura de testes automatizados (Jest) criada do zero. Dois
+  bugs reportados (overlay "DSW", texto "Tetd") investigados extensivamente e não reproduzidos
+  como defeito de código — registrados com hipóteses, sem correção especulativa. Ver
+  `docs/reviews/BUG_DEBT_018_1.md`.
+- **Sprint 19 — Notificações Push** — `DispositivoPush` (multi-dispositivo, preferências por
+  canal), `INotificationProvider`/`FirebaseNotificationProvider` (modo sem-op documentado — sem
+  credenciais Firebase reais disponíveis nesta sessão), `NotificationDispatcher`/`NotificationService`
+  com debounce de 60s em memória; hooks reais de disparo adicionados a `AlarmEventProcessor`,
+  `JflComandoServico`, `AutorizacaoServico` e `EntregaServico` (os dois últimos nunca publicavam
+  evento algum antes desta Sprint). Mobile: `expo-notifications` com token nativo FCM, 3 canais
+  Android, deep link com retry de prontidão, tela Ajustes → Notificações. Primeiro projeto de
+  testes automatizados do backend (`AppMorador.Tests`, 27 testes) + 22 novos testes no Mobile.
+  Achado arquitetural: o domínio não tinha granularidade para distinguir a maioria dos 8 eventos
+  assumidos pela missão — resolvido com hooks diretos na Aplicação, não no pipeline genérico de
+  eventos. iOS e agrupamento de notificações (Fase 8.1) ficam como dívida técnica. Ver ADR 0023 e
+  `docs/reviews/SPRINT_019.md`.
+- **Sprint 20 — Visualização de Câmeras** — aba Câmeras funcional (era Empty State desde a Sprint
+  16). `Camera` evoluída com `StatusCamera`/dois timestamps de captura; endpoints de lista/
+  snapshot (metadados vs. captura sob demanda)/imagem (autenticada, content-type sniffado)/status;
+  `ISnapshotCaptureService` extraída para permitir captura sob demanda por Id (o fluxo de alarme
+  já existente segue intacto); evento SignalR leve `CameraStatusAlterado`, separado do Snapshot
+  Operacional. Mobile: `expo-image`, grid 2 colunas com skeleton/pull-to-refresh, tela de detalhe
+  com "Atualizar imagem". Achado arquitetural: a entidade/captura de snapshot já existiam desde
+  antes da Sprint 1, mas só serviam ao fluxo de alarme — sem endpoint, sem forma de servir a
+  imagem por HTTP, sem seed. Wording honesto ("última imagem há X", nunca "offline desde X") por
+  não haver monitoramento contínuo. Streaming ao vivo, PTZ, cadastro de câmera no mobile e
+  detecção de movimento (nenhum gravador emite esse sinal) ficam fora de escopo/dívida técnica.
+  Ver ADR 0024 e `docs/reviews/SPRINT_020.md`.
+- **Sprint 21 — RBAC Master (Base de Permissões da Plataforma)** — RBAC completo para papéis
+  internos (Master/Técnico/Suporte): Policies via `RequireAssertion`, impersonation (token de
+  15min sem refresh, 100% auditado), auditoria centralizada, Permissões Funcionais + Feature
+  Flags por Propriedade, `ModeloEquipamento` real (substitui `Equipamento.Modelo` texto, com
+  backfill de dados na migration) + Capacidades Dinâmicas, Provisionamento (registro de
+  metadados). Cliente (Administrador) mantém `ProprietarioId` como fonte de verdade —
+  `UsuarioPropriedade` nasce como abstração preparatória, não substituição (Multiusuário fica para
+  Sprint futura dedicada, decisão explícita do usuário). Mobile: `usePermissao`, UI condicional em
+  5 telas, `GET /api/properties` enriquecido com perfil/permissões/features. 43 novos testes de
+  backend (87 total) + 16 novos testes de mobile (57 total), zero regressão. Painel Web fica fora
+  de escopo (Sprint 22). Ver ADRs 0021/0025/0026/0027/0028 e `docs/audits/AUDIT_RBAC_021.md`.
 
 ## Próximo
 
@@ -174,18 +230,22 @@
 - **Release 0.9.0**: ponto de restauração completo atingido na Sprint 17.5 — Release do GitHub
   preparada, pendente só de o usuário rodar o comando `gh release create` já entregue (bloqueio do
   classificador de segurança do ambiente de execução, não do processo).
-- **Sprint 18**: aguardando definição de escopo — não iniciar sem autorização explícita.
+- **Push real ponta a ponta**: pendente de credenciais Firebase reais (projeto no Firebase Console
+  + `google-services.json` + conta de serviço) — ver `docs/DIVIDA_TECNICA.md` item 38.
+- **Streaming ao vivo de câmeras**: Sprint 21+, base arquitetural (Gravador/Camera/providers por
+  fabricante) já pronta para receber sem retrabalho — ver ADR 0024.
 
 ## Não iniciado / backlog
 
-- **CRUD completo de Usuários** — hoje só existe Cadastro/Login/Refresh/Logout. Editar dados,
-  alterar senha, desativar/reativar conta, excluir conta e qualquer sistema de Perfis/Papéis
-  (Administrador/Supervisor/Operador/Morador) não existem — decisão explícita da Sprint 3.1 foi
-  homologar só o que existe hoje e registrar o restante aqui, não simular funcionalidade
-  inexistente. A Sprint 17 adicionou um `perfil` morador/técnico só como preferência de UI local
-  (sem nenhuma relação com autorização real, ver ADR 0020 e `docs/DIVIDA_TECNICA.md` item 34) —
-  quando este item for implementado de verdade, `perfil` local deve ser substituído pelo perfil
-  real vindo da API. Ver `docs/DIVIDA_TECNICA.md`.
+- **CRUD completo de Usuários (cliente)** — hoje só existe Cadastro/Login/Refresh/Logout para o
+  Administrador (dono da propriedade). Editar dados, alterar senha, desativar/reativar conta,
+  excluir conta continuam sem CRUD próprio. A Sprint 21 (ADR 0021/0025) já entrega um `perfil`
+  **real**, vindo da API (`GET /api/properties` → `perfil`/`permissoes`/`features`, consumido via
+  `usePermissao`) — mas o `perfil` **local** de `profilePreference.ts` (preferência de UI, ver ADR
+  0020) não foi removido nem substituído por ele nesta Sprint, para não expandir o escopo além do
+  pedido; os dois coexistem (um é preferência de UI, o outro é RBAC de verdade). CRUD completo de
+  Usuário/Morador com login próprio fica para a Sprint dedicada ao Multiusuário (ver ADR 0021).
+  Ver `docs/DIVIDA_TECNICA.md`.
 
 - **Integração de Controle de Acesso e Portões — Intelbras, Hikvision, Dahua, JFL** (Control iD já
   concluído na Sprint 11, ver abaixo) — o padrão OFICIAL de integração está estabelecido (ADR
@@ -252,3 +312,9 @@
 - Homologação de novos códigos Contact ID / novos fabricantes de DVR.
 - Registrar formalmente como ADR as decisões técnicas da Sprint 2 (adoção do Reanimated como
   padrão, `TipoPropriedade`) — ver `DIVIDA_TECNICA.md`.
+- **Push Notification (Firebase/APNs)** — citada como Sprint 19 pela missão da Sprint 18. Hoje o
+  app só reage em tempo real enquanto aberto (SignalR); notificações com o app fechado dependem
+  desse trabalho novo.
+- Telemetria de cache hit/miss (recomendação da Sprint 18, não implementada — ver ADR 0022).
+- Validação em dispositivo físico real da Sprint 18 (reconexão ao cair Wi-Fi/trocar de rede,
+  profiler de performance real) — pendente do usuário, mesmo padrão das Sprints 15-17.

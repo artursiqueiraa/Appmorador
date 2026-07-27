@@ -12,4 +12,7 @@ public interface ICameraResolver
 {
     /// <summary>Retorna a Camera (com Gravador carregado) vinculada a zona, ou null se nao houver vinculo.</summary>
     Task<Camera?> ResolveAsync(Guid zonaId, CancellationToken cancellationToken);
+
+    /// <summary>Sprint 20 — resolve a Camera (com Gravador carregado) diretamente pelo proprio Id, para a captura sob demanda (sem depender de uma Zona/alarme).</summary>
+    Task<Camera?> ResolveByIdAsync(Guid cameraId, CancellationToken cancellationToken);
 }

@@ -42,7 +42,15 @@
           }
         }
       ],
-      "react-native-edge-to-edge"
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/android-icon-monochrome.png",
+          "color": "#0A0E13"
+        }
+      ],
+      "react-native-edge-to-edge",
+      "expo-image"
     ],
     "extra": {
       "eas": {

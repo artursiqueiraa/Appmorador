@@ -9,11 +9,38 @@ export interface EntrarResponse {
   email: string;
 }
 
+/** Sprint 21 (ADR 0021) — mesmos nomes de `PerfilPropriedade` do backend (serializado como string). Só 'Administrador' é alcançável hoje (Morador ainda não tem login próprio). */
+export type PerfilPropriedade = 'Administrador' | 'Morador';
+
+/** Sprint 21 (ADR 0025) — mesmos nomes de `PermissaoFuncionalidade` do backend. */
+export type PermissaoFuncionalidade =
+  | 'CadastrarMorador'
+  | 'CadastrarFacial'
+  | 'CadastrarTag'
+  | 'CadastrarCamera'
+  | 'AlterarLeitor'
+  | 'AlterarGravador'
+  | 'ConfigurarPgm'
+  | 'ConfigurarIntegracoes'
+  | 'VerLogs'
+  | 'AbrirPortao'
+  | 'VerCameras'
+  | 'CriarVisitante';
+
+/** Sprint 21 (ADR 0026) — mesmos nomes de `FeatureFlag` do backend. */
+export type FeatureFlag = 'Facial' | 'Cameras' | 'Pgm' | 'Push' | 'Snapshot' | 'InterfoneSip' | 'StreamingAoVivo' | 'Ia';
+
 export interface PropriedadeResponse {
   id: string;
   nome: string;
   tipo: TipoPropriedade;
   endereco?: string | null;
+  /** Sprint 21 (ADR 0021) — perfil do usuário logado NESTA propriedade (nunca um papel global). */
+  perfil: PerfilPropriedade;
+  /** Sprint 21 (ADR 0025) — o que este usuário pode fazer nesta propriedade (varia por plano/concessão, não só pelo perfil). */
+  permissoes: PermissaoFuncionalidade[];
+  /** Sprint 21 (ADR 0026) — o que esta propriedade contratou (ortogonal a permissões — "pode fazer" vs. "existe pra fazer"). */
+  features: FeatureFlag[];
 }
 
 export interface DashboardResponse {
@@ -365,6 +392,33 @@ export interface EquipamentoSaudeResponse {
   estado: EstadoOperacional;
 }
 
+/** Sprint 20 (ADR 0024) — sem monitoramento contínuo: só muda no momento de uma tentativa de captura (alarme ou sob demanda). */
+export type StatusCamera = 'Desconhecido' | 'Online' | 'Offline';
+
+export interface CameraResponse {
+  id: string;
+  nome: string;
+  status: StatusCamera;
+  /** Caminho da Api (relativo) — o mobile monta a URL completa com o host + anexa o Bearer token (ver useAuthHeader). Null se nunca houve captura com sucesso. */
+  ultimaImagemUrl?: string | null;
+  ultimaVezVistaUtc?: string | null;
+}
+
+export interface CameraSnapshotResponse {
+  sucesso: boolean;
+  mensagemErro?: string | null;
+  ultimaImagemUrl?: string | null;
+  capturadaEmUtc?: string | null;
+  status: StatusCamera;
+}
+
+export interface CameraStatusResponse {
+  status: StatusCamera;
+  ultimaTentativaCapturaUtc?: string | null;
+  ultimoSucessoCapturaUtc?: string | null;
+  motivoIndisponibilidade?: string | null;
+}
+
 export interface SnapshotOperacionalResponse {
   geradoEmUtc: string;
   saude: EstadoOperacional;
@@ -375,4 +429,36 @@ export interface SnapshotOperacionalResponse {
   quantidadeAlarmesAtivos: number;
   quantidadeFalhasDetectadas: number;
   equipamentos: EquipamentoSaudeResponse[];
+}
+
+/** Sprint 19 (ADR 0023) — mesmos nomes do enum `PlataformaDispositivo` do backend (serializado como string). */
+export type PlataformaDispositivoPush = 'Android' | 'Ios';
+
+export interface RegistrarDispositivoPushRequest {
+  propriedadeId?: string | null;
+  plataforma: PlataformaDispositivoPush;
+  token: string;
+  modelo?: string | null;
+  versaoApp?: string | null;
+}
+
+export interface AtualizarDispositivoPushRequest {
+  token: string;
+  versaoApp?: string | null;
+}
+
+export interface AtualizarPreferenciasDispositivoPushRequest {
+  notificarAlertas: boolean;
+  notificarAtividades: boolean;
+  notificarGeral: boolean;
+}
+
+export interface DispositivoPushResponse {
+  id: string;
+  plataforma: PlataformaDispositivoPush;
+  ativo: boolean;
+  notificarAlertas: boolean;
+  notificarAtividades: boolean;
+  notificarGeral: boolean;
+  ultimoUsoUtc: string;
 }

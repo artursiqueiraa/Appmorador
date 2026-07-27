@@ -4,7 +4,7 @@ import { useNavigation, useRoute, type RouteProp } from '@react-navigation/nativ
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { ChevronLeft, ShieldCheck } from 'lucide-react-native';
 import { api, ApiError } from '../../api/client';
-import { useRealtime } from '../../realtime/RealtimeContext';
+import { useRealtimeSnapshot } from '../../realtime/RealtimeContext';
 import type { SnapshotOperacionalResponse } from '../../api/types';
 import { EstadoVazio } from '../../components/EstadoVazio';
 import { Skeleton } from '../../components/Skeleton';
@@ -25,7 +25,7 @@ export function SaudePropriedadeScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { params } = useRoute<SaudePropriedadeRouteProp>();
   const { propriedadeId, nomePropriedade } = params;
-  const { ultimoSnapshot } = useRealtime();
+  const { ultimoSnapshot } = useRealtimeSnapshot();
 
   const [snapshot, setSnapshot] = useState<SnapshotOperacionalResponse | null>(null);
   const [loading, setLoading] = useState(true);

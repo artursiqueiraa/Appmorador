@@ -9,7 +9,9 @@ import { SelecionarPropriedadeScreen } from '../screens/SelecionarPropriedadeScr
 import { OnboardingWizardScreen } from '../onboarding/OnboardingWizard/OnboardingWizardScreen';
 import { MainTabNavigator } from './MainTabNavigator';
 import { EventosScreen } from '../screens/eventos/EventosScreen';
+import { DetalheCameraScreen } from '../screens/cameras/DetalheCameraScreen';
 import { MinhaPropriedadeScreen } from '../screens/ajustes/MinhaPropriedadeScreen';
+import { NotificacoesScreen } from '../screens/ajustes/NotificacoesScreen';
 import { UnidadesScreen } from '../screens/unidades/UnidadesScreen';
 import { MoradoresScreen } from '../screens/moradores/MoradoresScreen';
 import { CredenciaisScreen } from '../screens/credenciais/CredenciaisScreen';
@@ -30,6 +32,9 @@ import { DetalhesCentralIntelbrasScreen } from '../screens/centraisIntelbras/Det
 import { CentralOperacionalScreen } from '../screens/operacional/CentralOperacionalScreen';
 import { SaudePropriedadeScreen } from '../screens/operacional/SaudePropriedadeScreen';
 import { colors } from '../theme/theme';
+import { navigationRef } from './navigationRef';
+import { definirTelaAtiva } from './telaAtivaStore';
+import { RealtimeToastBridge } from '../realtime/RealtimeToastBridge';
 import type { RootStackParamList } from './types';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -64,7 +69,13 @@ export function RootNavigator() {
   }
 
   return (
-    <NavigationContainer theme={navigationTheme}>
+    <NavigationContainer
+      ref={navigationRef}
+      theme={navigationTheme}
+      onReady={() => definirTelaAtiva(navigationRef.getCurrentRoute()?.name)}
+      onStateChange={() => definirTelaAtiva(navigationRef.getCurrentRoute()?.name)}
+    >
+      {user && selectedProperty ? <RealtimeToastBridge /> : null}
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {!user ? (
           <>
@@ -82,6 +93,7 @@ export function RootNavigator() {
             <Stack.Screen name="Onboarding" component={OnboardingWizardScreen} />
             <Stack.Screen name="Eventos" component={EventosScreen} />
             <Stack.Screen name="MinhaPropriedade" component={MinhaPropriedadeScreen} />
+            <Stack.Screen name="Notificacoes" component={NotificacoesScreen} />
             <Stack.Screen name="Unidades" component={UnidadesScreen} />
             <Stack.Screen name="Moradores" component={MoradoresScreen} />
             <Stack.Screen name="Credenciais" component={CredenciaisScreen} />
@@ -101,6 +113,7 @@ export function RootNavigator() {
             <Stack.Screen name="DetalhesCentralIntelbras" component={DetalhesCentralIntelbrasScreen} />
             <Stack.Screen name="CentralOperacional" component={CentralOperacionalScreen} />
             <Stack.Screen name="SaudePropriedade" component={SaudePropriedadeScreen} />
+            <Stack.Screen name="DetalheCamera" component={DetalheCameraScreen} />
           </>
         )}
       </Stack.Navigator>

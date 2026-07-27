@@ -17,13 +17,13 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "http://192.168.100.3:5027"
+        "EXPO_PUBLIC_API_URL": "http://SEU_IP_LOCAL:5027"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_URL": "http://192.168.100.3:5027"
+        "EXPO_PUBLIC_API_URL": "http://SEU_IP_LOCAL:5027"
       }
     }
   },

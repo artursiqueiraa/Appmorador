@@ -3,6 +3,44 @@
 Registro de toda migration aplicada ao banco `appmorador`, com o resumo técnico apresentado
 antes da aplicação (protocolo permanente de revisão).
 
+## 20260726212346_RbacMaster — 2026-07-26
+
+**Operações**: 3 `AddColumn` (`Usuarios.Ativo`, `Usuarios.RoleGlobal`, `Equipamentos.ModeloEquipamentoId`)
++ 7 `CreateTable` (`AuditoriaMaster`, `ModelosEquipamento`, `PropriedadesFeatureFlag`,
+`Provisionamentos`, `UsuariosPropriedade`, `ModelosEquipamentoCapacidade`,
+`UsuariosPropriedadePermissao`) + **2 operações de backfill de dados escritas manualmente** (a
+geração automática do `dotnet ef migrations add` não as inclui) + 1 `DropColumn`
+(`Equipamentos.Modelo`, texto livre).
+
+**Impacto nos dados**: `Equipamento.Modelo` (texto) migrado para `ModeloEquipamentoId` (FK) via
+backfill em 2 passos — `INSERT` em `ModelosEquipamento` a partir de todo par distinto
+`(Fabricante, Modelo)` já cadastrado, seguido de `UPDATE` que popula `Equipamentos.ModeloEquipamentoId`
+via `JOIN` — **antes** do `DropColumn`, preservando 100% dos dados existentes (nenhum "Modelo" já
+cadastrado se perde). Verificado após aplicar: 9 Equipamentos existentes, 5 com `Modelo` preenchido
+→ 4 `ModelosEquipamento` distintos criados, todos os 5 `Equipamento.ModeloEquipamentoId`
+corretamente resolvidos; os 4 Equipamentos sem `Modelo` preenchido permaneceram `NULL` (esperado).
+**Achado corrigido antes de aplicar**: a coluna `Usuarios.Ativo` nasceria com `defaultValue: false`
+gerado automaticamente pelo EF (satisfaz o `NOT NULL`, mas desativaria login de toda conta já
+existente) — adicionado `UPDATE Usuarios SET Ativo = 1;` logo após o `AddColumn`, e confirmado após
+aplicar: 14/14 contas existentes permaneceram `Ativo = 1`. As 7 tabelas novas nascem vazias
+(populadas depois via seed/backfill de aplicação, não pela migration).
+
+**Operações destrutivas**: 1 (`DropColumn Equipamentos.Modelo`) — mitigada pelo backfill acima,
+sem perda de dado. `Down()` recria a coluna mas não restaura os valores de texto originais
+(limitação aceita de rollback, mesmo padrão de qualquer migration deste projeto).
+
+**Avaliação de segurança**: nenhuma coluna sensível nova (`AuditoriaMaster` não tem FK para
+`Usuario` por design — `UsuarioId`/`UsuarioNome` são um snapshot desnormalizado, para a trilha de
+auditoria sobreviver mesmo se a conta de origem for excluída depois).
+
+**Recomendação**: aplicada com sucesso em 2026-07-26 (Sprint 21) após resumo técnico apresentado e
+2 achados corrigidos antes de `dotnet ef database update` contra o banco real (backfill de Modelo e
+correção do default de `Ativo`). Pós-aplicação: `dotnet build`/`dotnet test` (44/44) limpos, seed de
+desenvolvimento executado (conta Master criada, backfill de `UsuarioPropriedade` para as 12
+propriedades pré-existentes com 72 permissões do Plano Básico). Warnings benignos de
+`Model.Validation[10622]` (mesma classe já registrada desde a Sprint 6) aparecem para
+`UsuarioPropriedade`/`PropriedadeFeatureFlag`/`Provisionamento` — sem impacto funcional.
+
 ## 20260725115333_CamadaOperacionalUnificada — 2026-07-25
 
 **Operações**: 100% `CreateTable`/`CreateIndex` — 1 tabela nova (`SnapshotsOperacionais`), 1

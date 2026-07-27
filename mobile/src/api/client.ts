@@ -45,13 +45,29 @@ async function construirErroDeApi(status: number | undefined, mensagemTecnica: s
   return new ApiError(status ?? 0, amigavel.mensagem, mensagemTecnica);
 }
 
+/**
+ * Sprint 18.1 (hotfix) — sem isso, um backend inalcançável (comum num celular
+ * físico numa rede diferente da máquina de desenvolvimento) deixava `fetch`
+ * pendurado indefinidamente: a tela de propriedades ficava presa em
+ * `loading=true` para sempre ("não carrega") e o logout nunca terminava de
+ * chamar `setUser(null)` porque o `await` do POST de logout nunca resolvia
+ * ("não sai da conta"). 15s é generoso o bastante para uma rede móvel lenta
+ * sem deixar o usuário esperando indefinidamente por um servidor que não vai
+ * responder.
+ */
+const TIMEOUT_REQUISICAO_MS = 15000;
+
 async function request<T>(path: string, options: RequestInit = {}, allowRefresh = true): Promise<T> {
   const accessToken = await secureStorage.getAccessToken();
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_REQUISICAO_MS);
 
   let response: Response;
   try {
     response = await fetch(`${env.apiUrl}${path}`, {
       ...options,
+      signal: controller.signal,
       headers: {
         'Content-Type': 'application/json',
         ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
@@ -59,8 +75,11 @@ async function request<T>(path: string, options: RequestInit = {}, allowRefresh 
       },
     });
   } catch (err) {
-    // Falha antes de qualquer resposta existir (sem internet, servidor inalcançável).
-    throw await construirErroDeApi(undefined, err instanceof Error ? err.message : String(err));
+    const mensagem = err instanceof Error && err.name === 'AbortError' ? 'tempo esgotado' : err instanceof Error ? err.message : String(err);
+    // Falha antes de qualquer resposta existir (sem internet, servidor inalcançável, timeout).
+    throw await construirErroDeApi(undefined, mensagem);
+  } finally {
+    clearTimeout(timeoutId);
   }
 
   if (response.status === 401 && allowRefresh && accessToken) {

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import {
@@ -12,11 +12,12 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '../../auth/AuthContext';
-import { useRealtime } from '../../realtime/RealtimeContext';
+import { useRealtimeEvento, useRealtimeSnapshot } from '../../realtime/RealtimeContext';
 import { api, ApiError } from '../../api/client';
 import type { DashboardResponse, EventosPaginadosResponse } from '../../api/types';
 import type { RootStackParamList } from '../../navigation/types';
 import { ProfileHeader } from '../../components/ProfileHeader';
+import { IndicadorConexaoRealtime } from '../../components/IndicadorConexaoRealtime';
 import { HeroCard, type Conectividade, type HeroStatus } from '../../components/HeroCard';
 import { QuickAction } from '../../components/QuickAction';
 import { SectionHeader } from '../../components/SectionHeader';
@@ -44,7 +45,8 @@ type ModoArme = 'protegido' | 'noturno' | 'desarmado';
 export function HomeScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { user, selectedProperty } = useAuth();
-  const { ultimoSnapshot, ultimoEvento } = useRealtime();
+  const { ultimoSnapshot } = useRealtimeSnapshot();
+  const { ultimoEvento } = useRealtimeEvento();
 
   const [dashboard, setDashboard] = useState<DashboardResponse | null>(null);
   const [atividades, setAtividades] = useState<EventosPaginadosResponse['itens']>([]);
@@ -79,6 +81,23 @@ export function HomeScreen() {
     carregar();
   }, [carregar]);
 
+  // Sprint 18 (ADR 0022, Fase 8 — Troca de Propriedade) — ao trocar de
+  // propriedade, o dashboard/atividades da propriedade anterior nunca deve
+  // aparecer nem por um instante: descarta o cache local imediatamente (volta
+  // ao estado de carregamento sutil) antes do novo GET (disparado por
+  // `carregar`, acima) resolver. Não roda na primeira montagem — `carregar` já
+  // cobre o carregamento inicial sozinho.
+  const propriedadeIdAnteriorRef = useRef<string | null>(selectedProperty?.id ?? null);
+  useEffect(() => {
+    const novoId = selectedProperty?.id ?? null;
+    if (propriedadeIdAnteriorRef.current === novoId) {
+      return;
+    }
+    propriedadeIdAnteriorRef.current = novoId;
+    setDashboard(null);
+    setAtividades([]);
+  }, [selectedProperty?.id]);
+
   // Sprint 14 (ADR 0017) — atualização automática via SignalR, sem esperar refresh manual.
   useEffect(() => {
     if (!ultimoSnapshot || !selectedProperty || ultimoSnapshot.propriedadeId !== selectedProperty.id) {
@@ -109,10 +128,30 @@ export function HomeScreen() {
     }
   }, [ultimoEvento, selectedProperty]);
 
-  const handleArme = (modo: ModoArme) => {
+  // Sprint 18 (ADR 0022, Fase 3, Regra 1) — "Atividade recente" também recebe o
+  // evento novo ao vivo (sem refetch), tornando o Início uma tela onde o evento já
+  // é visível por si só — é por isso que o RealtimeToastBridge não mostra toast
+  // quando o morador está no Início.
+  useEffect(() => {
+    if (!ultimoEvento || !selectedProperty || ultimoEvento.propriedadeId !== selectedProperty.id) {
+      return;
+    }
+    setAtividades((atual) => {
+      if (atual.some((item) => item.id === ultimoEvento.evento.id)) {
+        return atual;
+      }
+      return [ultimoEvento.evento, ...atual].slice(0, 3);
+    });
+  }, [ultimoEvento, selectedProperty]);
+
+  const handleArme = useCallback((modo: ModoArme) => {
     ServicoFeedbackTatil.impactLight();
     setModoArme(modo);
-  };
+  }, []);
+
+  const armarTotal = useCallback(() => handleArme('protegido'), [handleArme]);
+  const armarNoturno = useCallback(() => handleArme('noturno'), [handleArme]);
+  const desarmar = useCallback(() => handleArme('desarmado'), [handleArme]);
 
   if (loading && !dashboard) {
     return <SkeletonDashboard />;
@@ -142,6 +181,7 @@ export function HomeScreen() {
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
       <Animated.View entering={FadeIn.duration(motion.duration.base)}>
+        <IndicadorConexaoRealtime />
         {semCentral ? (
           <PropertyCard
             nome="Complete sua configuração"
@@ -151,25 +191,9 @@ export function HomeScreen() {
           />
         ) : (
           <HeroCard status={status} titulo={titulo} subtitulo={subtitulo} conectividade={computarConectividade(dashboard)}>
-            <QuickAction
-              icon={Lock}
-              label="Armar total"
-              active={modoArme === 'protegido'}
-              onPress={() => handleArme('protegido')}
-            />
-            <QuickAction
-              icon={MoonStar}
-              label="Noturno"
-              active={modoArme === 'noturno'}
-              onPress={() => handleArme('noturno')}
-            />
-            <QuickAction
-              icon={Unlock}
-              label="Desarmar"
-              tone="warn"
-              active={modoArme === 'desarmado'}
-              onPress={() => handleArme('desarmado')}
-            />
+            <QuickAction icon={Lock} label="Armar total" active={modoArme === 'protegido'} onPress={armarTotal} />
+            <QuickAction icon={MoonStar} label="Noturno" active={modoArme === 'noturno'} onPress={armarNoturno} />
+            <QuickAction icon={Unlock} label="Desarmar" tone="warn" active={modoArme === 'desarmado'} onPress={desarmar} />
           </HeroCard>
         )}
 

@@ -6,6 +6,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Camera, ChevronLeft, ChevronRight, KeyRound, Trash2 } from 'lucide-react-native';
 import { api, ApiError } from '../../api/client';
 import type { CredencialResponse, StatusCredencial, TipoCredencial } from '../../api/types';
+import { usePermissao } from '../../auth/usePermissao';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { TipoCredencialSelector, rotuloTipoCredencial } from '../../components/TipoCredencialSelector';
 import { EstadoVazio } from '../../components/EstadoVazio';
@@ -67,6 +68,18 @@ export function CredenciaisScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { params } = useRoute<CredenciaisRouteProp>();
   const { moradorId, nomeMorador, propriedadeId } = params;
+  const { temPermissao } = usePermissao();
+  // Sprint 21 (ADR 0025) — QrCode/Pin/Biometria/ChaveVirtual não têm Permissão
+  // Funcional própria ainda (só Facial/Tag têm, ver PermissaoFuncionalidade),
+  // então continuam sempre visíveis — só os dois com permissão dedicada são gated.
+  const tiposPermitidos: TipoCredencial[] = [
+    ...(temPermissao('CadastrarFacial') ? (['Facial'] as const) : []),
+    ...(temPermissao('CadastrarTag') ? (['TagRfid'] as const) : []),
+    'QrCode',
+    'Pin',
+    'Biometria',
+    'ChaveVirtual',
+  ];
 
   const [credenciais, setCredenciais] = useState<CredencialResponse[]>([]);
   const [fotosLocais, setFotosLocais] = useState<Record<string, string>>({});
@@ -333,7 +346,7 @@ export function CredenciaisScreen() {
         </View>
       ) : showForm ? (
         <View style={styles.form}>
-          <TipoCredencialSelector label="Tipo de credencial" value={tipo} onChange={setTipo} />
+          <TipoCredencialSelector label="Tipo de credencial" value={tipo} onChange={setTipo} permitidos={tiposPermitidos} />
           <PrimaryButton label="Adicionar credencial" onPress={salvar} loading={salvando} disabled={!tipo} />
           <PrimaryButton label="Cancelar" variant="secondary" onPress={() => setShowForm(false)} />
         </View>

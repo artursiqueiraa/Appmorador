@@ -13,8 +13,13 @@ interface Props {
   disabled?: boolean;
 }
 
-/** Sprint 16 (ADR 0019, UX001) — botão de ação rápida com ícone e label (HeroCard, telas de detalhe). */
-export function QuickAction({ icon: Icon, label, active, tone = 'safe', onPress, disabled }: Props) {
+/**
+ * Sprint 16 (ADR 0019, UX001) — botão de ação rápida com ícone e label (HeroCard, telas de detalhe).
+ * Sprint 18 (ADR 0022, Regra 5) — memoizado: não deve re-renderizar quando o
+ * HeroCard atualiza por um snapshot que não muda `active`/`disabled` (exige que o
+ * chamador passe `onPress` estável via `useCallback`, ver HomeScreen).
+ */
+export const QuickAction = React.memo(function QuickAction({ icon: Icon, label, active, tone = 'safe', onPress, disabled }: Props) {
   const corAtiva = tone === 'warn' ? colors.warn : colors.safe;
   const bgAtivo = tone === 'warn' ? colors.warnDim : colors.safeDim;
   const borderAtivo = tone === 'warn' ? colors.warnLine : colors.safeLine;
@@ -36,7 +41,7 @@ export function QuickAction({ icon: Icon, label, active, tone = 'safe', onPress,
       <Text style={[styles.label, { color: active ? colors.text : colors.sub }]}>{label}</Text>
     </Pressable>
   );
-}
+});
 
 const styles = StyleSheet.create({
   container: {

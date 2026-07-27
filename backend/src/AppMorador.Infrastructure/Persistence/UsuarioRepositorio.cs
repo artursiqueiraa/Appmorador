@@ -19,6 +19,16 @@ internal sealed class UsuarioRepositorio : IUsuarioRepositorio
     public Task<Usuario?> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
         _db.Usuarios.FirstOrDefaultAsync(u => u.Id == id, cancellationToken);
 
+    public async Task<IReadOnlyList<Usuario>> ListInternosAsync(CancellationToken cancellationToken) =>
+        await _db.Usuarios
+            .Where(u => u.RoleGlobal != null)
+            .OrderBy(u => u.Nome)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+    public Task<bool> ExisteAlgumMasterAsync(CancellationToken cancellationToken) =>
+        _db.Usuarios.AnyAsync(u => u.RoleGlobal == RoleSistema.Master, cancellationToken);
+
     public async Task AddAsync(Usuario usuario, CancellationToken cancellationToken) =>
         await _db.Usuarios.AddAsync(usuario, cancellationToken).ConfigureAwait(false);
 

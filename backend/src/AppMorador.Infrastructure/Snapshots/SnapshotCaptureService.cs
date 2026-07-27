@@ -1,3 +1,4 @@
+using AppMorador.Domain.Entities;
 using AppMorador.Domain.Snapshots;
 using Microsoft.Extensions.Logging;
 
@@ -11,7 +12,7 @@ namespace AppMorador.Infrastructure.Snapshots;
 /// JFL em si (isso e do <see cref="AppMorador.Infrastructure.Jfl.AlarmEventProcessor"/>,
 /// que apenas chama este servico depois de criar a Ocorrencia).
 /// </summary>
-public sealed class SnapshotCaptureService
+public sealed class SnapshotCaptureService : ISnapshotCaptureService
 {
     private readonly ICameraResolver _cameraResolver;
     private readonly IEnumerable<ISnapshotProvider> _providers;
@@ -39,7 +40,26 @@ public sealed class SnapshotCaptureService
             return SnapshotResult.Fail("Nenhuma camera vinculada a esta zona (VinculoZonaCamera inexistente).");
         }
 
-        var gravador = camera.Gravador;
+        return await CapturarInternoAsync(camera, propriedadeId, recebidoEmUtc, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Sprint 20 — captura sob demanda (botão "Atualizar imagem"), sem depender de uma Zona/alarme; resolve a Camera diretamente pelo Id.</summary>
+    public async Task<SnapshotResult> CapturarPorCameraIdAsync(Guid cameraId, DateTime recebidoEmUtc, CancellationToken cancellationToken)
+    {
+        var camera = await _cameraResolver.ResolveByIdAsync(cameraId, cancellationToken).ConfigureAwait(false);
+
+        if (camera?.Gravador is null)
+        {
+            return SnapshotResult.Fail("Camera nao encontrada ou sem gravador vinculado.");
+        }
+
+        return await CapturarInternoAsync(camera, camera.PropriedadeId, recebidoEmUtc, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<SnapshotResult> CapturarInternoAsync(
+        Camera camera, Guid propriedadeId, DateTime recebidoEmUtc, CancellationToken cancellationToken)
+    {
+        var gravador = camera.Gravador!;
         var provider = _providers.FirstOrDefault(p => p.Fabricante == gravador.Fabricante);
         if (provider is null)
         {

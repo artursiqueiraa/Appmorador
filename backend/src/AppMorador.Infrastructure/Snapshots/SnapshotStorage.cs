@@ -32,4 +32,15 @@ internal sealed class SnapshotStorage : ISnapshotStorage
 
         return $"{relativeDir}/{fileName}";
     }
+
+    public Stream? OpenRead(string relativePath)
+    {
+        // O caminho devolvido por SaveAsync ja inclui o BasePath no inicio
+        // ("{BasePath}/{propriedadeId}/{yyyy}/{MM}/{dd}/{guid}.jpg") e e relativo ao
+        // diretorio de trabalho do processo (mesma base usada em Directory.CreateDirectory
+        // acima) — só precisa trocar "/" pelo separador do SO, nunca combinar com
+        // _options.BasePath de novo (duplicaria o segmento).
+        var caminho = relativePath.Replace('/', Path.DirectorySeparatorChar);
+        return File.Exists(caminho) ? File.OpenRead(caminho) : null;
+    }
 }

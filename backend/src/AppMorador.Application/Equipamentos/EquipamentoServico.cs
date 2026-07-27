@@ -14,13 +14,18 @@ public sealed class EquipamentoServico : IEquipamentoServico
 {
     private readonly IPropriedadeRepositorio _propriedades;
     private readonly IEquipamentoRepositorio _equipamentos;
+    private readonly IModeloEquipamentoRepositorio _modelosEquipamento;
     private readonly ICriptografiaSimetrica _criptografia;
 
     public EquipamentoServico(
-        IPropriedadeRepositorio propriedades, IEquipamentoRepositorio equipamentos, ICriptografiaSimetrica criptografia)
+        IPropriedadeRepositorio propriedades,
+        IEquipamentoRepositorio equipamentos,
+        IModeloEquipamentoRepositorio modelosEquipamento,
+        ICriptografiaSimetrica criptografia)
     {
         _propriedades = propriedades;
         _equipamentos = equipamentos;
+        _modelosEquipamento = modelosEquipamento;
         _criptografia = criptografia;
     }
 
@@ -40,12 +45,14 @@ public sealed class EquipamentoServico : IEquipamentoServico
             return Result<EquipamentoResponse>.Fail(erroValidacao);
         }
 
+        var modeloEquipamentoId = await ResolverOuCriarModeloAsync(request.Fabricante, request.Modelo, cancellationToken).ConfigureAwait(false);
+
         var equipamento = new Equipamento
         {
             Id = Guid.NewGuid(),
             PropriedadeId = propriedadeId,
             Nome = request.Nome.Trim(),
-            Modelo = NullIfBlank(request.Modelo),
+            ModeloEquipamentoId = modeloEquipamentoId,
             Fabricante = request.Fabricante,
             Ip = NullIfBlank(request.Ip),
             Porta = request.Porta,
@@ -145,7 +152,7 @@ public sealed class EquipamentoServico : IEquipamentoServico
         }
 
         equipamento!.Nome = request.Nome.Trim();
-        equipamento.Modelo = NullIfBlank(request.Modelo);
+        equipamento.ModeloEquipamentoId = await ResolverOuCriarModeloAsync(request.Fabricante, request.Modelo, cancellationToken).ConfigureAwait(false);
         equipamento.Fabricante = request.Fabricante;
         equipamento.Ip = NullIfBlank(request.Ip);
         equipamento.Porta = request.Porta;
@@ -178,6 +185,33 @@ public sealed class EquipamentoServico : IEquipamentoServico
         return Result.Ok();
     }
 
+    /// <summary>
+    /// Sprint 21 (ADR 0027) — get-or-create transparente: o cliente (mobile/painel)
+    /// continua enviando um texto livre de modelo, exatamente como antes desta
+    /// Sprint (zero mudança de contrato) — o backend é quem resolve isso para o
+    /// catálogo real (<see cref="ModeloEquipamento"/>), nunca duplicando um modelo já
+    /// existente para o mesmo Fabricante.
+    /// </summary>
+    private async Task<Guid?> ResolverOuCriarModeloAsync(FabricanteEquipamento fabricante, string? nomeModelo, CancellationToken cancellationToken)
+    {
+        var nome = NullIfBlank(nomeModelo);
+        if (nome is null)
+        {
+            return null;
+        }
+
+        var existente = await _modelosEquipamento.GetByFabricanteENomeAsync(fabricante, nome, cancellationToken).ConfigureAwait(false);
+        if (existente is not null)
+        {
+            return existente.Id;
+        }
+
+        var novo = new ModeloEquipamento { Id = Guid.NewGuid(), Fabricante = fabricante, Nome = nome, CreatedAtUtc = DateTime.UtcNow };
+        await _modelosEquipamento.AddAsync(novo, cancellationToken).ConfigureAwait(false);
+        await _modelosEquipamento.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        return novo.Id;
+    }
+
     private static bool PertenceAoProprietario(Equipamento? equipamento, Guid proprietarioId) =>
         equipamento?.Propriedade is not null && equipamento.Propriedade.ProprietarioId == proprietarioId;
 
@@ -188,7 +222,8 @@ public sealed class EquipamentoServico : IEquipamentoServico
         Id = equipamento.Id,
         PropriedadeId = equipamento.PropriedadeId,
         Nome = equipamento.Nome,
-        Modelo = equipamento.Modelo,
+        Modelo = equipamento.ModeloEquipamento?.Nome,
+        ModeloEquipamentoId = equipamento.ModeloEquipamentoId,
         Fabricante = equipamento.Fabricante,
         Ip = equipamento.Ip,
         Porta = equipamento.Porta,

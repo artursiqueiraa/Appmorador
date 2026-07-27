@@ -71,6 +71,23 @@ public class AppDbContext : DbContext
 
     public DbSet<SnapshotOperacional> SnapshotsOperacionais => Set<SnapshotOperacional>();
 
+    public DbSet<DispositivoPush> DispositivosPush => Set<DispositivoPush>();
+
+    // Sprint 21 (ADR 0021) — RBAC Master.
+    public DbSet<UsuarioPropriedade> UsuariosPropriedade => Set<UsuarioPropriedade>();
+
+    public DbSet<UsuarioPropriedadePermissao> UsuariosPropriedadePermissao => Set<UsuarioPropriedadePermissao>();
+
+    public DbSet<PropriedadeFeatureFlag> PropriedadesFeatureFlag => Set<PropriedadeFeatureFlag>();
+
+    public DbSet<ModeloEquipamento> ModelosEquipamento => Set<ModeloEquipamento>();
+
+    public DbSet<ModeloEquipamentoCapacidade> ModelosEquipamentoCapacidade => Set<ModeloEquipamentoCapacidade>();
+
+    public DbSet<Provisionamento> Provisionamentos => Set<Provisionamento>();
+
+    public DbSet<AuditoriaMaster> AuditoriaMaster => Set<AuditoriaMaster>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Central>()
@@ -130,6 +147,12 @@ public class AppDbContext : DbContext
         // uma camera (ou o inverso) no futuro sem mudar o schema.
         modelBuilder.Entity<Gravador>()
             .Property(g => g.Fabricante)
+            .HasConversion<string>();
+
+        // Sprint 20 — mesmo padrao de StatusEquipamento/StatusResolucao: enum de negocio
+        // trafega/persiste como texto legivel, nunca como numero interno (ADR 0005).
+        modelBuilder.Entity<Camera>()
+            .Property(c => c.Status)
             .HasConversion<string>();
 
         // Sprint 1 — Autenticacao/Propriedade.
@@ -495,5 +518,152 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<SnapshotOperacional>()
             .HasIndex(s => s.PropriedadeId)
             .IsUnique();
+
+        // Sprint 19 — Notificacoes Push (ADR 0023). Um dispositivo pertence a um
+        // Usuario (nunca compartilhado); Propriedade e opcional (token pode ser
+        // registrado antes de qualquer Propriedade estar selecionada). Sem soft
+        // delete: "Ativo=false" ja e o mecanismo de desativacao (logout, token
+        // invalido) — nunca removido fisicamente, para historico (mesmo racional do
+        // RefreshToken).
+        modelBuilder.Entity<DispositivoPush>()
+            .HasOne(d => d.Usuario)
+            .WithMany()
+            .HasForeignKey(d => d.UsuarioId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<DispositivoPush>()
+            .HasOne(d => d.Propriedade)
+            .WithMany()
+            .HasForeignKey(d => d.PropriedadeId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<DispositivoPush>()
+            .Property(d => d.Plataforma)
+            .HasConversion<string>();
+
+        modelBuilder.Entity<DispositivoPush>()
+            .HasIndex(d => d.Token)
+            .IsUnique();
+
+        modelBuilder.Entity<DispositivoPush>()
+            .HasIndex(d => new { d.UsuarioId, d.Ativo });
+
+        // Sprint 21 (ADR 0021) — RBAC Master. RoleGlobal e nullable (so preenchido
+        // para internos) — HasConversion<string> funciona normalmente em enum
+        // nullable, convertendo null para null.
+        modelBuilder.Entity<Usuario>()
+            .Property(u => u.RoleGlobal)
+            .HasConversion<string>();
+
+        // UsuarioPropriedade: um vinculo unico por (Usuario, Propriedade) — nunca
+        // duplicado. Cascade em ambos os lados (Sprint 21 so cria 1 linha por
+        // Propriedade, o Administrador/dono — ver ADR 0021).
+        modelBuilder.Entity<UsuarioPropriedade>()
+            .HasOne(v => v.Usuario)
+            .WithMany()
+            .HasForeignKey(v => v.UsuarioId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<UsuarioPropriedade>()
+            .HasOne(v => v.Propriedade)
+            .WithMany()
+            .HasForeignKey(v => v.PropriedadeId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<UsuarioPropriedade>()
+            .Property(v => v.Perfil)
+            .HasConversion<string>();
+
+        modelBuilder.Entity<UsuarioPropriedade>()
+            .HasIndex(v => new { v.UsuarioId, v.PropriedadeId })
+            .IsUnique();
+
+        modelBuilder.Entity<UsuarioPropriedadePermissao>()
+            .HasOne(p => p.UsuarioPropriedade)
+            .WithMany()
+            .HasForeignKey(p => p.UsuarioPropriedadeId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<UsuarioPropriedadePermissao>()
+            .Property(p => p.Permissao)
+            .HasConversion<string>();
+
+        modelBuilder.Entity<UsuarioPropriedadePermissao>()
+            .HasIndex(p => new { p.UsuarioPropriedadeId, p.Permissao })
+            .IsUnique();
+
+        modelBuilder.Entity<PropriedadeFeatureFlag>()
+            .HasOne(f => f.Propriedade)
+            .WithMany()
+            .HasForeignKey(f => f.PropriedadeId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<PropriedadeFeatureFlag>()
+            .Property(f => f.Feature)
+            .HasConversion<string>();
+
+        modelBuilder.Entity<PropriedadeFeatureFlag>()
+            .HasIndex(f => new { f.PropriedadeId, f.Feature })
+            .IsUnique();
+
+        // ModeloEquipamento: Fabricante+Nome unico (mesma chave usada pelo
+        // get-or-create transparente em EquipamentoServico, ver ADR 0027).
+        modelBuilder.Entity<ModeloEquipamento>()
+            .Property(m => m.Fabricante)
+            .HasConversion<string>();
+
+        modelBuilder.Entity<ModeloEquipamento>()
+            .HasIndex(m => new { m.Fabricante, m.Nome })
+            .IsUnique();
+
+        modelBuilder.Entity<ModeloEquipamentoCapacidade>()
+            .HasOne(c => c.ModeloEquipamento)
+            .WithMany()
+            .HasForeignKey(c => c.ModeloEquipamentoId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<ModeloEquipamentoCapacidade>()
+            .Property(c => c.Capacidade)
+            .HasConversion<string>();
+
+        modelBuilder.Entity<ModeloEquipamentoCapacidade>()
+            .HasIndex(c => new { c.ModeloEquipamentoId, c.Capacidade })
+            .IsUnique();
+
+        // Equipamento.ModeloEquipamentoId — SetNull (nunca Cascade): remover um
+        // modelo do catalogo nao pode apagar o equipamento que aponta pra ele.
+        modelBuilder.Entity<Equipamento>()
+            .HasOne(e => e.ModeloEquipamento)
+            .WithMany()
+            .HasForeignKey(e => e.ModeloEquipamentoId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<Provisionamento>()
+            .HasOne(p => p.Propriedade)
+            .WithMany()
+            .HasForeignKey(p => p.PropriedadeId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<Provisionamento>()
+            .Property(p => p.Template)
+            .HasConversion<string>();
+
+        modelBuilder.Entity<Provisionamento>()
+            .Property(p => p.Status)
+            .HasConversion<string>();
+
+        // AuditoriaMaster e trilha generica (mesmo espirito de HistoricoCredencial/
+        // RegistroEventoAlarme): sem FK para Usuario de proposito — o registro
+        // precisa sobreviver mesmo que a conta interna seja excluida no futuro,
+        // entao guarda UsuarioNome como snapshot de texto, nunca via navegacao.
+        modelBuilder.Entity<AuditoriaMaster>()
+            .Property(a => a.Acao)
+            .HasConversion<string>();
+
+        modelBuilder.Entity<AuditoriaMaster>()
+            .HasIndex(a => a.DataHoraUtc);
+
+        modelBuilder.Entity<AuditoriaMaster>()
+            .HasIndex(a => a.UsuarioId);
     }
 }

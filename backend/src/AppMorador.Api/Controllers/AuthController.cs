@@ -1,4 +1,6 @@
+using AppMorador.Api.Auth;
 using AppMorador.Application.Autenticacao;
+using AppMorador.Application.Rbac;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -10,10 +12,12 @@ namespace AppMorador.Api.Controllers;
 public sealed class AuthController : ControllerBase
 {
     private readonly IAutenticacaoServico _autenticacaoServico;
+    private readonly IImpersonationServico _impersonationServico;
 
-    public AuthController(IAutenticacaoServico autenticacaoServico)
+    public AuthController(IAutenticacaoServico autenticacaoServico, IImpersonationServico impersonationServico)
     {
         _autenticacaoServico = autenticacaoServico;
+        _impersonationServico = impersonationServico;
     }
 
     [HttpPost("register")]
@@ -59,6 +63,32 @@ public sealed class AuthController : ControllerBase
     public async Task<IActionResult> Logout([FromBody] SairRequest request, CancellationToken cancellationToken)
     {
         await _autenticacaoServico.LogoutAsync(request.RefreshToken, cancellationToken);
+        return NoContent();
+    }
+
+    /// <summary>Sprint 21 (ADR 0021, Fase 3) — Master/Suporte "entram como" um cliente. Técnico não tem esta capacidade (ver Policies.RequerSuporte).</summary>
+    [HttpPost("impersonar")]
+    [Authorize(Policy = Policies.RequerSuporte)]
+    public async Task<IActionResult> Impersonar([FromBody] ImpersonarRequest request, CancellationToken cancellationToken)
+    {
+        var result = await _impersonationServico.IniciarAsync(
+            User.GetUsuarioId(), request.PropriedadeId, HttpContext.Connection.RemoteIpAddress?.ToString(), cancellationToken);
+
+        if (!result.Success)
+        {
+            return NotFound(new { error = result.Error });
+        }
+
+        return Ok(result.Data);
+    }
+
+    [HttpPost("impersonar/encerrar")]
+    [Authorize(Policy = Policies.RequerSuporte)]
+    public async Task<IActionResult> EncerrarImpersonation([FromBody] ImpersonarRequest request, CancellationToken cancellationToken)
+    {
+        await _impersonationServico.EncerrarAsync(
+            User.GetUsuarioId(), request.PropriedadeId, HttpContext.Connection.RemoteIpAddress?.ToString(), cancellationToken);
+
         return NoContent();
     }
 }

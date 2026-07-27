@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using AppMorador.Application.Cameras;
 using AppMorador.Application.Eventos;
 using AppMorador.Application.Operacional;
 using Microsoft.AspNetCore.SignalR;
@@ -69,6 +70,22 @@ public sealed class OperacionalHubPublicador : IOperacionalEventoPublicador
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Falha ao publicar novo evento em tempo real (propriedade {PropriedadeId})", propriedadeId);
+        }
+    }
+
+    public async Task PublicarCameraStatusAsync(Guid propriedadeId, CameraStatusEvento evento, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _hub.Clients.Group(OperacionalHub.GrupoPropriedade(propriedadeId))
+                .SendAsync("CameraStatusAlterado", new { propriedadeId, evento }, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex, "Falha ao publicar status de camera em tempo real (propriedade {PropriedadeId}, camera {CameraId})",
+                propriedadeId, evento.CameraId);
         }
     }
 

@@ -5,6 +5,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { ChevronLeft, ChevronRight, Trash2, UserSquare2 } from 'lucide-react-native';
 import { api, ApiError } from '../../api/client';
 import type { VisitanteResponse } from '../../api/types';
+import { usePermissao } from '../../auth/usePermissao';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { TextField } from '../../components/TextField';
 import { EstadoVazio } from '../../components/EstadoVazio';
@@ -25,6 +26,8 @@ export function VisitantesScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { params } = useRoute<VisitantesRouteProp>();
   const { propriedadeId, nomePropriedade } = params;
+  const { temPermissao } = usePermissao();
+  const podeCriarVisitante = temPermissao('CriarVisitante');
 
   const [visitantes, setVisitantes] = useState<VisitanteResponse[]>([]);
   const [loading, setLoading] = useState(true);
@@ -180,7 +183,7 @@ export function VisitantesScreen() {
                 icon={UserSquare2}
                 titulo="Nenhum visitante ainda"
                 descricao="Cadastre quem pode visitar esta propriedade para depois criar autorizações de acesso."
-                cta={{ label: 'Adicionar visitante', onPress: abrirNovo }}
+                cta={podeCriarVisitante ? { label: 'Adicionar visitante', onPress: abrirNovo } : undefined}
               />
             ) : null
           }
@@ -217,9 +220,9 @@ export function VisitantesScreen() {
           />
           <PrimaryButton label="Cancelar" variant="secondary" onPress={() => setShowForm(false)} />
         </View>
-      ) : (
+      ) : podeCriarVisitante ? (
         <PrimaryButton label="Adicionar visitante" variant="secondary" onPress={abrirNovo} />
-      )}
+      ) : null}
     </View>
   );
 }

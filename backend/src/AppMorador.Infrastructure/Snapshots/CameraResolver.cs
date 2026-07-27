@@ -6,9 +6,11 @@ using Microsoft.EntityFrameworkCore;
 namespace AppMorador.Infrastructure.Snapshots;
 
 /// <summary>
-/// Unica classe que sabe consultar VinculoZonaCamera/Camera/Gravador. Extraida de
-/// SnapshotCaptureService, que antes fazia essa consulta diretamente — agora so
-/// recebe o resultado ja resolvido e executa a captura.
+/// Unica classe (junto de <see cref="AppMorador.Infrastructure.Persistence.CameraRepositorio"/>,
+/// Sprint 20 — a porta de aplicativo para listar/exibir câmeras) que consulta
+/// VinculoZonaCamera/Camera/Gravador. Extraida de SnapshotCaptureService, que antes
+/// fazia essa consulta diretamente — agora so recebe o resultado ja resolvido e
+/// executa a captura.
 /// </summary>
 internal sealed class CameraResolver : ICameraResolver
 {
@@ -29,4 +31,9 @@ internal sealed class CameraResolver : ICameraResolver
 
         return link?.Camera;
     }
+
+    public Task<Camera?> ResolveByIdAsync(Guid cameraId, CancellationToken cancellationToken) =>
+        _db.Cameras
+            .Include(c => c.Gravador)
+            .FirstOrDefaultAsync(c => c.Id == cameraId, cancellationToken);
 }

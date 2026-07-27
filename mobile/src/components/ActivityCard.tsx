@@ -10,8 +10,12 @@ interface Props {
   meta: string;
 }
 
-/** Sprint 16 (ADR 0019, UX001) — card de evento com ícone, título, subtítulo e tempo (Atividade recente, Histórico). */
-export function ActivityCard({ icon: Icon, color, title, meta }: Props) {
+/**
+ * Sprint 16 (ADR 0019, UX001) — card de evento com ícone, título, subtítulo e tempo (Atividade recente, Histórico).
+ * Sprint 18 (ADR 0022, Regra 5) — memoizado: a lista de Atividade recente não deve
+ * re-renderizar todos os cards quando o HeroCard atualiza por causa de um snapshot novo.
+ */
+export const ActivityCard = React.memo(function ActivityCard({ icon: Icon, color, title, meta }: Props) {
   return (
     <View style={styles.container}>
       <View style={styles.iconWrap}>
@@ -25,7 +29,7 @@ export function ActivityCard({ icon: Icon, color, title, meta }: Props) {
       </View>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   container: {

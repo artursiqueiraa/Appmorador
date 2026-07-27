@@ -2,6 +2,214 @@
 
 Registro cronológico das mudanças relevantes do projeto. Cada Sprint/Fase adiciona uma entrada.
 
+## [Sprint 21 — RBAC Master (Base de Permissões da Plataforma)] — 2026-07-26
+
+Objetivo: base de autorização para AppMorador + futuro Painel Web — papéis internos (Master/
+Técnico/Suporte), Permissões Funcionais, Feature Flags por Propriedade, Capacidades Dinâmicas por
+Equipamento, Provisionamento e Auditoria. Cliente (Administrador) mantém `ProprietarioId` como
+fonte de verdade nesta Sprint — `UsuarioPropriedade` nasce como abstração preparatória para o
+Multiusuário (Sprint futura dedicada), não como substituição. Ver `docs/audits/AUDIT_RBAC_021.md`
+e ADRs 0021/0025/0026/0027/0028.
+
+### Adicionado (backend)
+- Domínio: `RoleSistema` (Master/Tecnico/Suporte, exclusivo de internos), `UsuarioPropriedade` +
+  `PerfilPropriedade`, `PermissaoFuncionalidade` + `UsuarioPropriedadePermissao`, `FeatureFlag` +
+  `PropriedadeFeatureFlag`, `EquipamentoCapacidade` + `ModeloEquipamento` (entidade própria,
+  substitui `Equipamento.Modelo` texto) + `ModeloEquipamentoCapacidade`, `Provisionamento`
+  (metadados — árvore de equipamentos vinculados fica para Sprint futura), `AuditoriaMaster` (sem
+  FK para `Usuario`, por design — snapshot desnormalizado).
+- Autorização: 7 Policies (`RequerMaster/Tecnico/Suporte/Interno/Cliente/Administrador/Morador`)
+  via `RequireAssertion` centralizado em `Program.cs`; `IPermissaoService` (permissão funcional,
+  feature flag, capacidade de equipamento); handler de auditoria automática de falha de
+  autorização (`AuditoriaAuthorizationMiddlewareResultHandler`, decora o handler padrão do
+  ASP.NET Core — nenhum Controller chama isso manualmente).
+- Impersonation: `POST api/auth/impersonar`/`impersonar/encerrar` (Master/Suporte — Técnico
+  deliberadamente sem essa capacidade), token de 15min sem refresh, 100% auditado.
+- Endpoints novos: `usuarios-internos`, `modelos-equipamento` (+ `equipamentos/{id}/capacidades`
+  client-facing, ownership-checked), `properties/{id}/provisionamentos`,
+  `properties/{id}/features`, `properties/{id}/usuarios/{id}/permissoes`, `auditoria` — todos
+  protegidos por Policy.
+- Seed: conta Master padrão (`master@appmorador.local`); backfill de `UsuarioPropriedade` +
+  Permissões do Plano Básico para propriedades pré-existentes.
+- Migration `RbacMaster`: backfill de dados (`Equipamento.Modelo` texto → `ModeloEquipamento` FK)
+  escrito manualmente antes do `DropColumn`, e correção do default de `Usuarios.Ativo` — ver
+  `docs/ALTERACOES_BANCO.md`. Aplicada e verificada: 0 contas desativadas, 0 dado de Modelo
+  perdido, 44/44 testes de backend existentes continuam passando.
+
+### Adicionado (backend, testes)
+- 43 novos testes automatizados (`Rbac/`, `Auditoria/`, `Equipamentos/`, `Provisionamentos/`,
+  `Propriedades/`) — 87/87 testes de backend passando (44 pré-existentes + 43 novos), zero
+  regressão.
+- `GET /api/properties` enriquecido com `perfil`/`permissoes`/`features` por propriedade
+  (`PropriedadeServico.ToDtoEnriquecidoAsync`) — único ponto pelo qual o cliente lê seu próprio
+  RBAC, sempre ownership-checked (nunca expõe as rotas internas de Feature Flag/Permissão
+  diretamente ao app).
+
+### Adicionado (mobile)
+- `usePermissao` (novo hook): única fonte de verdade no app para "o que este usuário pode fazer"/
+  "o que esta propriedade contratou" — lê de `selectedProperty` (nunca do `perfil` local de
+  `profilePreference.ts`, que é preferência de UI sem relação com este modelo).
+- UI condicional em 5 telas: `MoradoresScreen`/`VisitantesScreen` (esconde "Adicionar" sem
+  `CadastrarMorador`/`CriarVisitante`), `AccessScreen` (esconde Painel de Controle sem
+  `AbrirPortao`), `CamerasScreen` (estado honesto "não contratadas" sem `FeatureFlag.Cameras` —
+  aba continua sempre visível, preservando ADR 0019/Navegação Previsível), `CredenciaisScreen` +
+  `TipoCredencialSelector` (esconde chips "Facial"/"Tag RFID" sem `CadastrarFacial`/`CadastrarTag`).
+- 16 novos testes automatizados (`usePermissao.test.tsx`) — 57/57 testes de mobile passando (41
+  pré-existentes + 16 novos), zero regressão. `typecheck`/`lint`/`expo-doctor` limpos.
+
+### Pendente nesta Sprint
+EAS Build Preview + homologação manual em dispositivo físico + parecer do Reviewer (9 pilares).
+Painel Web fica fora de escopo (Sprint 22), por decisão explícita do usuário.
+
+## [Sprint 20 — Visualização de Câmeras] — 2026-07-26
+
+Objetivo: tornar a aba Câmeras funcional (existia desde a Sprint 16 só como Empty State). A
+entidade `Camera`/captura de snapshot já existiam (Fases 1-2, pré-Sprint 1), mas só serviam ao
+fluxo de snapshot-no-disparo-de-alarme — não havia endpoint, não havia como servir a imagem por
+HTTP, e não havia seed para popular a propriedade de exemplo. Ver ADR 0024 e
+`docs/reviews/SPRINT_020.md`.
+
+### Adicionado
+- **Backend**: `Camera` evoluída com `StatusCamera` (Desconhecido/Online/Offline) +
+  `UltimoSnapshotPath`/`UltimaTentativaCapturaUtc`/`UltimoSucessoCapturaUtc`; endpoints
+  `GET /api/properties/{id}/cameras`, `GET`/`POST /api/cameras/{id}/snapshot` (metadados vs.
+  captura sob demanda), `GET /api/cameras/{id}/imagem` (bytes autenticados, content-type
+  sniffado), `GET /api/cameras/{id}/status`.
+- **Backend**: `ISnapshotCaptureService` extraída (porta em Domain) para permitir captura sob
+  demanda por Id, sem depender de uma Zona/alarme; `ICameraResolver.ResolveByIdAsync` novo.
+- **Backend**: evento SignalR leve `CameraStatusAlterado`, separado do Snapshot Operacional
+  (câmera é exibição, não faz parte do cálculo de saúde operacional).
+- **Backend**: seed de desenvolvimento — 1 gravador + 3 câmeras de exemplo (Entrada/Sala/Fundos),
+  2 com imagem real gerada em memória (`PlaceholderImageGenerator`, PNG sem dependência nova),
+  idempotente por conta própria (backfilla mesmo num banco onde a conta Morador já existia).
+- **Backend**: 17 novos testes automatizados (`CameraServico`, seed).
+- **Mobile**: `expo-image` instalado; aba Câmeras real (grid 2 colunas, skeleton, pull-to-refresh,
+  Empty State honesto); `DetalheCameraScreen` (imagem ampliada, botão "Atualizar imagem" com
+  timeout/loading/aviso amigável); 4º context em `RealtimeContext` (`useRealtimeCamera`) — status
+  atualiza sozinho via SignalR.
+- **Mobile**: 15 novos testes automatizados (`cameraLabels`, `aplicarAtualizacaoCamera`,
+  `useAuthHeader`).
+- **CLAUDE.md**: Regra de Validação em Dispositivo tornada permanente (5 etapas obrigatórias —
+  Implementação → Testes Automatizados → APK Preview → Homologação Manual → Reviewer — para toda
+  Sprint que altere o app mobile).
+
+### Decisões conscientes de escopo
+- Wording honesto: nunca "Offline desde X" (sem monitoramento contínuo, não sabemos o instante
+  exato) — sempre "última imagem há X".
+- Detecção de movimento não implementada — nenhum gravador emite esse sinal hoje.
+- Imagem servida via endpoint autenticado (Bearer + checagem de posse), nunca static files
+  públicos.
+- `POST /snapshot` sempre 200 (nunca 202 "processando") — a captura é síncrona, sem canal
+  assíncrono real por trás (mesmo racional do ADR 0022 Decisão 10 para comandos JFL).
+
+## [Sprint 19 — Notificações Push] — 2026-07-26
+
+Objetivo: complementar o tempo real da Sprint 18 (app aberto) com notificações push (app
+fechado/em segundo plano). Auditoria inicial encontrou que o domínio não tinha granularidade
+suficiente para 3 dos 8 eventos assumidos pela missão (visitante autorizado, entrega recebida,
+equipamento offline nunca publicavam evento algum) — resolvido com hooks diretos nos Application
+Services, sem alterar Domínio (exceto a nova entidade `DispositivoPush`). Ver ADR 0023 e
+`docs/reviews/SPRINT_019.md`.
+
+### Adicionado
+- **Backend**: entidade `DispositivoPush` (multi-dispositivo por usuário, preferências de canal por
+  dispositivo), `INotificationProvider`/`FirebaseNotificationProvider` (modo sem-op documentado sem
+  credenciais Firebase reais), `NotificationDispatcher`/`NotificationService` (debounce de 60s em
+  memória, mensagens fixas por tipo de evento), `DispositivoPushServico` + `DispositivosPushController`
+  (registrar/atualizar token/atualizar preferências/desativar).
+- **Backend**: hooks reais de disparo — alarme (`AlarmEventProcessor`), armar/desarmar/PGM
+  (`JflComandoServico`), visitante autorizado (`AutorizacaoServico`, nunca publicava evento antes),
+  entrega recebida (`EntregaServico`, idem), transição para offline de equipamento (nunca notifica
+  o retorno online, por decisão explícita da missão).
+- **Backend**: primeiro projeto de testes automatizados do repositório (`AppMorador.Tests`, xUnit +
+  Moq) — 27 testes cobrindo dispatcher, service, ciclo de vida do token e debounce.
+- **Mobile**: `expo-notifications` integrado — permissão solicitada só na transição sem-sessão →
+  com-sessão (nunca insiste se negada), registro/atualização/remoção de token (token nativo FCM,
+  não o proxy do Expo), 3 canais Android (Alertas/Atividades/Geral), supressão da notificação de
+  sistema quando o app está em primeiro plano (SignalR/Toast já cobrem), deep link por `acao` com
+  retry de prontidão do `NavigationContainer`, tela Ajustes → Notificações (toggles por canal,
+  reativação via `Linking.openSettings()` quando negada).
+- **Mobile**: `registerBeforeLogoutHook` em `AuthContext` (mesmo padrão de
+  `registerSessionExpiredHandler`) — desregistra o dispositivo antes da sessão ser limpa no logout.
+- **Mobile**: 22 novos testes automatizados (`pushService`, mapeamento de deep link).
+
+### Decisões conscientes de escopo
+- PGM notifica como "🔓 Comando acionado" (não "Portão aberto") — o backend genuinamente não
+  conhece o rótulo amigável do PGM (preferência só local do Mobile, Sprint 17).
+- Agrupamento de notificações (Fase 8.1) não implementado — só o limite de frequência (debounce).
+- iOS não implementado/validado — sem certificado APNs/dispositivo físico neste ambiente.
+- Preferências de canal exibidas na tela Ajustes são espelhadas localmente (sem `GET` novo no
+  backend, não solicitado pela missão).
+
+## [Sprint 18.1 — Hotfix: Correções Críticas de UX e Estabilidade] — 2026-07-26
+
+Objetivo: corrigir bugs críticos encontrados na validação em dispositivo físico da Sprint 18.
+Nenhuma funcionalidade nova, nenhuma alteração de backend. Ver `docs/reviews/BUG_DEBT_018_1.md`.
+
+### Corrigido
+- **Timeout de 15s em todas as requisições HTTP** (`api/client.ts`) — causa raiz confirmada de
+  "propriedades não carregam" e "não sai da conta": `fetch` nunca tinha limite de tempo, então um
+  backend inalcançável deixava a requisição pendurada para sempre.
+- **Logout com limpeza local garantida** — `setUser(null)`/`setSelectedProperty(null)` agora
+  rodam num `finally`, nunca dependendo da revogação no servidor ter sucesso; feedback visual
+  (spinner) adicionado durante o processo.
+- **Máquina de estados de carregamento em "Suas propriedades"** (`SelecionarPropriedadeScreen`) —
+  Skeleton na primeira carga, erro com "Tentar novamente", nunca mais uma tela em branco.
+- **`SafeAreaProvider` adicionado globalmente** (`App.tsx`) — antes só `BottomNavigation.tsx`
+  respeitava a área segura do dispositivo; "Suas propriedades" (fora da Bottom Tab Bar) tinha um
+  botão cortado pela barra de navegação do Android, agora corrigido com `useSafeAreaInsets()`.
+- Cor hardcoded (`#062015`) removida de `PrimaryButton.tsx`, substituída pelo token `colors.bg`;
+  opacidades de estado (`disabled`/`pressed`) trocadas pelos tokens já existentes.
+- Espaçamento do formulário em "Suas propriedades" (colava no topo com a lista vazia); placeholder
+  do endereço melhorado ("Rua, número, bairro, cidade").
+
+### Adicionado
+- **Infraestrutura de testes automatizados** (Jest + `jest-expo` + `@testing-library/react-native`)
+  — não existia nenhuma antes desta Sprint. 4 testes cobrindo as duas causas-raiz corrigidas.
+
+### Não reproduzido (investigado, sem correção especulativa aplicada)
+- Overlay "DSW": nenhum código no repositório produz isso (busca extensiva por string, avatar/
+  iniciais, cores hex, dependências de debug) — hipótese mais forte é um overlay de sistema/
+  dispositivo, não um bug do app. Ver `docs/reviews/BUG_DEBT_018_1.md`.
+- Texto "Tetd": sem lógica de truncamento no código; banco de dados não tem essa propriedade —
+  provavelmente dado real digitado durante teste manual, não um bug de renderização.
+
+## [Sprint 18 — Experiência em Tempo Real] — 2026-07-26
+
+Objetivo: aproveitar a infraestrutura já existente (SignalR, Snapshot, Timeline) para o app
+responder imediatamente a eventos importantes, sem refresh manual — zero alteração de domínio/API/
+integrações/arquitetura de backend. Ver ADR 0022 e `docs/reviews/SPRINT_018.md`.
+
+### Adicionado
+- **RealtimeContext dividido em 3** (`useRealtimeConexao`/`useRealtimeSnapshot`/`useRealtimeEvento`)
+  — cada consumidor só re-renderiza pelo que realmente usa.
+- **Backoff exponencial customizado** de reconexão (1s/2s/5s/10s/30s, 5 tentativas) + estado
+  `sem-comunicacao` com botão "Tentar novamente" manual.
+- **`IndicadorConexaoRealtime`**: componente reutilizável de status de conexão, silencioso quando
+  saudável.
+- **Timeline com inserção real**: eventos novos entram no topo com Fade+Slide, selo "Novo" (5s),
+  scroll nunca é puxado quando o usuário rolou para baixo (banner "N novos eventos · Ver novos"),
+  cache máximo de 50 eventos.
+- **Toast generalizado** (`erro`/`sucesso`/`info`/`alerta`, fila máx. 10) + `RealtimeToastBridge`:
+  toast só aparece quando a tela em foco (rastreada via `navigationRef`/`telaAtivaStore`, sem
+  biblioteca nova) ainda não torna o evento visível por si só.
+- **Painel de Controle com máquina de estados** (Normal/Enviando/Sucesso/Falha, timeout de 10s) e
+  status Online/Offline por equipamento atualizado ao vivo via Snapshot.
+- **Pull-to-Refresh na aba Acessos** (não existia antes desta Sprint).
+- **Telemetria de desenvolvimento** (`services/telemetria.ts`, `__DEV__` only).
+- HeroCard/QuickAction/ActivityCard/ItemEvento/CommandCard memoizados (`React.memo`).
+
+### Corrigido
+- Troca de propriedade deixava o dado da propriedade anterior visível por um instante em
+  `HomeScreen`/`AccessScreen` — corrigido com descarte explícito de cache no momento da troca.
+- Timeline só fazia refetch completo da página 1 ao receber um evento (não uma inserção real) —
+  corrigido.
+
+### Achado arquitetural (documentado, não uma dívida técnica)
+- `JflComandoServico.ExecutarComandoAsync` é síncrono — não existe canal de confirmação assíncrona
+  via SignalR para comandos. A máquina de estados do Painel de Controle foi desenhada para refletir
+  essa realidade (ver ADR 0022 Decisão 10).
+
 ## [Sprint 17.5 — Release 0.9.0, Backup, Portabilidade e Disaster Recovery] — 2026-07-25
 
 Objetivo: transformar o AppMorador num projeto reproduzível, documentado, versionado e

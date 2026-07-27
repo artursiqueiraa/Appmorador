@@ -5,6 +5,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Car, ChevronLeft, ChevronRight, Pencil, Trash2, User, UserCheck, UserX } from 'lucide-react-native';
 import { api, ApiError } from '../../api/client';
 import type { MoradorResponse, StatusMorador } from '../../api/types';
+import { usePermissao } from '../../auth/usePermissao';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { TextField } from '../../components/TextField';
 import { EstadoVazio } from '../../components/EstadoVazio';
@@ -26,6 +27,8 @@ export function MoradoresScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { params } = useRoute<MoradoresRouteProp>();
   const { unidadeId, identificacaoUnidade, propriedadeId } = params;
+  const { temPermissao } = usePermissao();
+  const podeCadastrarMorador = temPermissao('CadastrarMorador');
 
   const [moradores, setMoradores] = useState<MoradorResponse[]>([]);
   const [loading, setLoading] = useState(true);
@@ -212,7 +215,7 @@ export function MoradoresScreen() {
                 icon={User}
                 titulo="Nenhum morador ainda"
                 descricao="Cadastre quem mora nesta unidade para manter o controle da propriedade em dia."
-                cta={{ label: 'Adicionar morador', onPress: abrirNovo }}
+                cta={podeCadastrarMorador ? { label: 'Adicionar morador', onPress: abrirNovo } : undefined}
               />
             ) : null
           }
@@ -257,9 +260,9 @@ export function MoradoresScreen() {
           />
           <PrimaryButton label="Cancelar" variant="secondary" onPress={() => setShowForm(false)} />
         </View>
-      ) : (
+      ) : podeCadastrarMorador ? (
         <PrimaryButton label="Adicionar morador" variant="secondary" onPress={abrirNovo} />
-      )}
+      ) : null}
     </View>
   );
 }

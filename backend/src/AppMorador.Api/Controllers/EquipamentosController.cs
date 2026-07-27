@@ -1,5 +1,6 @@
 using AppMorador.Api.Auth;
 using AppMorador.Application.Equipamentos;
+using AppMorador.Application.Rbac;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -18,11 +19,14 @@ public sealed class EquipamentosController : ControllerBase
 {
     private readonly IEquipamentoServico _equipamentoServico;
     private readonly IEquipamentoIntegracaoServico _integracaoServico;
+    private readonly IPermissaoService _permissaoService;
 
-    public EquipamentosController(IEquipamentoServico equipamentoServico, IEquipamentoIntegracaoServico integracaoServico)
+    public EquipamentosController(
+        IEquipamentoServico equipamentoServico, IEquipamentoIntegracaoServico integracaoServico, IPermissaoService permissaoService)
     {
         _equipamentoServico = equipamentoServico;
         _integracaoServico = integracaoServico;
+        _permissaoService = permissaoService;
     }
 
     [HttpPost("api/properties/{propriedadeId:guid}/equipamentos")]
@@ -83,6 +87,24 @@ public sealed class EquipamentosController : ControllerBase
         }
 
         return NoContent();
+    }
+
+    /// <summary>
+    /// Sprint 21 (ADR 0027) — capacidades dinâmicas do equipamento (nunca hardcoded
+    /// por fabricante no app/painel). Ownership verificado via GetByIdAsync ANTES de
+    /// consultar o IPermissaoService (que por si só não faz esse check — ver ADR 0021).
+    /// </summary>
+    [HttpGet("api/equipamentos/{id:guid}/capacidades")]
+    public async Task<IActionResult> ListarCapacidades(Guid id, CancellationToken cancellationToken)
+    {
+        var equipamento = await _equipamentoServico.GetByIdAsync(User.GetUsuarioId(), id, cancellationToken);
+        if (!equipamento.Success)
+        {
+            return NotFound(new { error = equipamento.Error });
+        }
+
+        var capacidades = await _permissaoService.ListarCapacidadesAsync(id, cancellationToken);
+        return Ok(capacidades);
     }
 
     [HttpPost("api/equipamentos/{id:guid}/testar-conexao")]

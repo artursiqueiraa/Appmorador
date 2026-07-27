@@ -19,6 +19,18 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+/**
+ * Sprint 19 (ADR 0023) — mesmo padrão de `registerSessionExpiredHandler` (`api/client.ts`):
+ * `PushNotificationProvider` precisa desregistrar o dispositivo (DELETE autenticado)
+ * ANTES da sessão ser limpa — se esperasse `user` virar `null` para reagir, o token de
+ * acesso já teria sido apagado e a chamada falharia com 401.
+ */
+let onBeforeLogout: (() => Promise<void>) | null = null;
+
+export function registerBeforeLogoutHook(hook: (() => Promise<void>) | null): void {
+  onBeforeLogout = hook;
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<StoredUser | null>(null);
@@ -56,19 +68,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await api.post('/api/auth/register', { nome, email, senha: password });
   };
 
+  // Sprint 18.1 (hotfix) — a limpeza local (linhas do `finally`) sempre roda, não
+  // importa o que aconteça na revogação do servidor: antes, se `secureStorage.clear()`
+  // por algum motivo lançasse, `setUser(null)` nunca era chamado e o usuário ficava
+  // "preso" na conta. Combinado com o timeout de 15s do `client.ts`, o logout agora
+  // sempre termina num tempo limitado, mesmo com o backend inalcançável.
   const logout = async () => {
-    const refreshToken = await secureStorage.getRefreshToken();
-    if (refreshToken) {
-      try {
-        await api.post('/api/auth/logout', { refreshToken });
-      } catch {
-        // Mesmo se a revogação no servidor falhar, a sessão local é limpa de qualquer forma.
+    try {
+      await onBeforeLogout?.().catch(() => {});
+      const refreshToken = await secureStorage.getRefreshToken();
+      if (refreshToken) {
+        await api.post('/api/auth/logout', { refreshToken }).catch(() => {
+          // Mesmo se a revogação no servidor falhar/expirar, a sessão local é limpa de qualquer forma.
+        });
       }
+    } finally {
+      await secureStorage.clear().catch(() => {});
+      setUser(null);
+      setSelectedProperty(null);
     }
-
-    await secureStorage.clear();
-    setUser(null);
-    setSelectedProperty(null);
   };
 
   const selectProperty = (property: PropriedadeResponse) => setSelectedProperty(property);

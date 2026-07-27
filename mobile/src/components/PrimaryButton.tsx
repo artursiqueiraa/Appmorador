@@ -1,6 +1,6 @@
 import React from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text } from 'react-native';
-import { colors, fontSize, fontWeight, radius } from '../theme/theme';
+import { colors, fontSize, fontWeight, opacity, radius } from '../theme/theme';
 
 interface Props {
   label: string;
@@ -25,7 +25,7 @@ export function PrimaryButton({ label, onPress, loading, disabled, variant = 'pr
       ]}
     >
       {loading ? (
-        <ActivityIndicator color={isPrimary ? '#062015' : colors.text} />
+        <ActivityIndicator color={isPrimary ? colors.bg : colors.text} />
       ) : (
         <Text style={[styles.label, isPrimary ? styles.labelPrimary : styles.labelSecondary]}>{label}</Text>
       )}
@@ -50,17 +50,17 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
   },
   disabled: {
-    opacity: 0.5,
+    opacity: opacity.disabled,
   },
   pressed: {
-    opacity: 0.85,
+    opacity: opacity.pressed,
   },
   label: {
     fontSize: fontSize.body + 1,
     fontWeight: fontWeight.black,
   },
   labelPrimary: {
-    color: '#062015',
+    color: colors.bg,
   },
   labelSecondary: {
     color: colors.text,

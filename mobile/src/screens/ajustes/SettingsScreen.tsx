@@ -1,5 +1,5 @@
-import React from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Bell, ChevronRight, FileText, Home, LogOut, User, Wrench } from 'lucide-react-native';
@@ -21,11 +21,27 @@ import { colors, fontSize, fontWeight, iconSize, radius, spacing } from '../../t
 export function SettingsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { user, selectedProperty, perfil, setPerfil, logout } = useAuth();
+  const [saindo, setSaindo] = useState(false);
 
+  // Sprint 18.1 (hotfix) — sem feedback visual, um logout lento (rede ruim) parecia
+  // "não fazer nada" para o morador, que às vezes tocava várias vezes sem efeito
+  // (o botão de confirmação do Alert nativo já evita múltiplos disparos simultâneos,
+  // mas nada indicava que o app estava de fato processando o pedido).
   const confirmarSaida = () => {
     Alert.alert('Sair da conta?', 'Você pode entrar de novo quando quiser.', [
       { text: 'Cancelar', style: 'cancel' },
-      { text: 'Sair', style: 'destructive', onPress: () => logout() },
+      {
+        text: 'Sair',
+        style: 'destructive',
+        onPress: async () => {
+          setSaindo(true);
+          try {
+            await logout();
+          } finally {
+            setSaindo(false);
+          }
+        },
+      },
     ]);
   };
 
@@ -57,7 +73,7 @@ export function SettingsScreen() {
 
       <View style={styles.secao}>
         <Text style={styles.secaoTitulo}>Conta</Text>
-        <MenuLinha icon={Bell} label="Notificações" onPress={() => Alert.alert('Notificações', 'Em breve você poderá escolher o que quer ser avisado.')} />
+        <MenuLinha icon={Bell} label="Notificações" onPress={() => navigation.navigate('Notificacoes')} />
         <View style={styles.toggleLinha}>
           <View style={styles.itemIconWrap}>
             <Wrench size={iconSize.sm} color={colors.sub} />
@@ -81,9 +97,15 @@ export function SettingsScreen() {
       </View>
 
       <View style={styles.secao}>
-        <Pressable style={styles.sair} onPress={confirmarSaida}>
-          <LogOut size={iconSize.sm} color={colors.danger} />
-          <Text style={styles.sairTexto}>Sair</Text>
+        <Pressable style={[styles.sair, saindo && styles.sairDesabilitado]} onPress={confirmarSaida} disabled={saindo}>
+          {saindo ? (
+            <ActivityIndicator color={colors.danger} size="small" />
+          ) : (
+            <>
+              <LogOut size={iconSize.sm} color={colors.danger} />
+              <Text style={styles.sairTexto}>Sair</Text>
+            </>
+          )}
         </Pressable>
       </View>
     </ScrollView>
@@ -166,4 +188,5 @@ const styles = StyleSheet.create({
     borderColor: colors.dangerLine,
   },
   sairTexto: { color: colors.danger, fontSize: fontSize.body, fontWeight: fontWeight.bold },
+  sairDesabilitado: { opacity: 0.6 },
 });

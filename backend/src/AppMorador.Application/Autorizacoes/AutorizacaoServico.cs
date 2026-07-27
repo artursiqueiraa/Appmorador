@@ -1,4 +1,5 @@
 using AppMorador.Application.Common;
+using AppMorador.Application.Notificacoes;
 using AppMorador.Domain.Entities;
 using AppMorador.Domain.Repositories;
 
@@ -18,19 +19,22 @@ public sealed class AutorizacaoServico : IAutorizacaoServico
     private readonly IMoradorRepositorio _moradores;
     private readonly IAutorizacaoRepositorio _autorizacoes;
     private readonly IHistoricoVisitanteRepositorio _historico;
+    private readonly INotificationDispatcher _notificationDispatcher;
 
     public AutorizacaoServico(
         IVisitanteRepositorio visitantes,
         IUnidadeRepositorio unidades,
         IMoradorRepositorio moradores,
         IAutorizacaoRepositorio autorizacoes,
-        IHistoricoVisitanteRepositorio historico)
+        IHistoricoVisitanteRepositorio historico,
+        INotificationDispatcher notificationDispatcher)
     {
         _visitantes = visitantes;
         _unidades = unidades;
         _moradores = moradores;
         _autorizacoes = autorizacoes;
         _historico = historico;
+        _notificationDispatcher = notificationDispatcher;
     }
 
     public async Task<Result<AutorizacaoResponse>> CreateAsync(
@@ -83,6 +87,16 @@ public sealed class AutorizacaoServico : IAutorizacaoServico
             $"Autorização criada para {morador.Nome} ({unidade.Identificacao}).", proprietarioId, cancellationToken)
             .ConfigureAwait(false);
         await _autorizacoes.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+        await _notificationDispatcher.NotificarAsync(
+            EventoNotificacaoTipo.VisitanteAutorizado,
+            new ContextoNotificacao
+            {
+                PropriedadeId = unidade.Propriedade!.Id,
+                NomePropriedade = unidade.Propriedade.Nome,
+                NomeContextual = visitante.Nome,
+            },
+            cancellationToken).ConfigureAwait(false);
 
         return Result<AutorizacaoResponse>.Ok(ToDto(autorizacao, morador.Nome, unidade.Identificacao, visitante.Nome));
     }

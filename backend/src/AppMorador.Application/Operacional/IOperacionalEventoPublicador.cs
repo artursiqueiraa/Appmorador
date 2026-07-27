@@ -1,3 +1,4 @@
+using AppMorador.Application.Cameras;
 using AppMorador.Application.Eventos;
 
 namespace AppMorador.Application.Operacional;
@@ -23,4 +24,7 @@ public interface IOperacionalEventoPublicador
 
     /// <summary>Publica um evento novo da Central de Eventos já persistido — nunca cria ou classifica o evento.</summary>
     Task PublicarNovoEventoAsync(Guid propriedadeId, EventoResponse evento, CancellationToken cancellationToken);
+
+    /// <summary>Sprint 20 — evento leve, separado do Snapshot Operacional (ver <see cref="CameraStatusEvento"/>): câmera é exibição, não faz parte do cálculo de saúde operacional.</summary>
+    Task PublicarCameraStatusAsync(Guid propriedadeId, CameraStatusEvento evento, CancellationToken cancellationToken);
 }

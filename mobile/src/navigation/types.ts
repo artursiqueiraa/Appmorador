@@ -16,6 +16,7 @@ export type RootStackParamList = {
   MainTabs: NavigatorScreenParams<MainTabParamList> | undefined;
   Eventos: undefined;
   MinhaPropriedade: undefined;
+  Notificacoes: undefined;
   Unidades: { propriedadeId: string; nomePropriedade: string };
   Moradores: { unidadeId: string; identificacaoUnidade: string; propriedadeId: string };
   Credenciais: { moradorId: string; nomeMorador: string; propriedadeId: string };
@@ -35,4 +36,5 @@ export type RootStackParamList = {
   DetalhesCentralIntelbras: { equipamentoId: string };
   CentralOperacional: { propriedadeId: string; nomePropriedade: string };
   SaudePropriedade: { propriedadeId: string; nomePropriedade: string };
+  DetalheCamera: { cameraId: string; nomeCamera: string };
 };

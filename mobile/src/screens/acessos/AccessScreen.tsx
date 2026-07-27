@@ -1,9 +1,11 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Car, ChevronRight, DoorOpen, Package, ParkingSquare, UserPlus, Users, Zap } from 'lucide-react-native';
 import { useAuth } from '../../auth/AuthContext';
+import { usePermissao } from '../../auth/usePermissao';
+import { useRealtimeSnapshot } from '../../realtime/RealtimeContext';
 import { api, ApiError } from '../../api/client';
 import { useToast } from '../../components/Toast';
 import type { EquipamentoResponse, MoradorResponse, ResultadoComandoJfl, UnidadeResponse, VisitanteResponse } from '../../api/types';
@@ -72,7 +74,10 @@ async function carregarComandosJfl(propriedadeId: string): Promise<ComandoPainel
 export function AccessScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { selectedProperty } = useAuth();
+  const { temPermissao } = usePermissao();
+  const podeAbrirPortao = temPermissao('AbrirPortao');
   const { mostrarErro } = useToast();
+  const { ultimoSnapshot } = useRealtimeSnapshot();
   const [aba, setAba] = useState<Aba>('moradores');
   const [moradores, setMoradores] = useState<(MoradorResponse & { nomeUnidade: string })[]>([]);
   const [visitantes, setVisitantes] = useState<VisitanteResponse[]>([]);
@@ -138,16 +143,61 @@ export function AccessScreen() {
     carregar();
   }, [carregar]);
 
+  // Sprint 18 (ADR 0022, Fase 8 — Troca de Propriedade) — nunca misturar dado de
+  // moradores/visitantes/comandos entre propriedades, nem por um instante.
+  const propriedadeIdAnteriorRef = useRef<string | null>(selectedProperty?.id ?? null);
+  useEffect(() => {
+    const novoId = selectedProperty?.id ?? null;
+    if (propriedadeIdAnteriorRef.current === novoId) {
+      return;
+    }
+    propriedadeIdAnteriorRef.current = novoId;
+    setMoradores([]);
+    setVisitantes([]);
+    setComandos([]);
+    setPainelDispensado(false);
+  }, [selectedProperty?.id]);
+
+  // Sprint 18 (ADR 0022, Fase 6) — status Online/Offline dos equipamentos do
+  // Painel de Controle atualiza sozinho via Snapshot, sem refazer a lista
+  // inteira (Regra 5): só os campos `conectado`/`descricaoEstado` dos comandos
+  // cujo equipamento aparece no snapshot são tocados.
+  useEffect(() => {
+    if (!ultimoSnapshot || !selectedProperty || ultimoSnapshot.propriedadeId !== selectedProperty.id) {
+      return;
+    }
+
+    const estadoPorEquipamento = new Map(ultimoSnapshot.snapshot.equipamentos.map((eq) => [eq.equipamentoId, eq.estado]));
+
+    setComandos((atual) =>
+      atual.map((comando) => {
+        const estado = estadoPorEquipamento.get(comando.equipamentoId);
+        if (!estado) {
+          return comando;
+        }
+        const conectado = estado !== 'Offline';
+        if (conectado === comando.conectado) {
+          return comando;
+        }
+        return { ...comando, conectado, descricaoEstado: conectado ? 'Pronto' : 'Sem comunicação com o equipamento' };
+      }),
+    );
+  }, [ultimoSnapshot, selectedProperty]);
+
   if (!selectedProperty) {
     return null;
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      refreshControl={<RefreshControl refreshing={loading} onRefresh={carregar} tintColor={colors.safe} />}
+    >
       <Text style={styles.titulo}>Acessos</Text>
       <Text style={styles.subtitulo}>Quem pode entrar e como</Text>
 
-      {!loading && (
+      {!loading && podeAbrirPortao && (
         <View style={styles.painel}>
           <Text style={styles.secaoTitulo}>Painel de Controle</Text>
           {comandos.length > 0 ? (
@@ -159,6 +209,7 @@ export function AccessScreen() {
                   label={comando.rotulo.label}
                   conectado={comando.conectado}
                   descricaoEstado={comando.descricaoEstado}
+                  equipamentoId={comando.equipamentoId}
                   onAcionar={() => acionarComando(comando)}
                 />
               ))}

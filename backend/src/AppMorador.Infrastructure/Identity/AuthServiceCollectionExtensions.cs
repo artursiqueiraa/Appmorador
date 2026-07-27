@@ -1,5 +1,8 @@
+using AppMorador.Application.Auditoria;
 using AppMorador.Application.Autenticacao;
 using AppMorador.Application.Autorizacoes;
+using AppMorador.Application.Rbac;
+using AppMorador.Application.Cameras;
 using AppMorador.Application.ControlId;
 using AppMorador.Application.Credenciais;
 using AppMorador.Application.Dashboard;
@@ -14,6 +17,7 @@ using AppMorador.Application.PermissoesAcesso;
 using AppMorador.Application.PermissoesVeiculares;
 using AppMorador.Application.PontosAcesso;
 using AppMorador.Application.Propriedades;
+using AppMorador.Application.Provisionamentos;
 using AppMorador.Application.Unidades;
 using AppMorador.Application.Vagas;
 using AppMorador.Application.Veiculos;
@@ -73,6 +77,24 @@ public static class AuthServiceCollectionExtensions
         services.AddScoped<IStatusCentralJflRepositorio, StatusCentralJflRepositorio>();
         services.AddScoped<ICentralRepositorio, CentralRepositorio>();
         services.AddScoped<ISnapshotOperacionalRepositorio, SnapshotOperacionalRepositorio>();
+        services.AddScoped<ICameraRepositorio, CameraRepositorio>();
+        services.AddScoped<ICameraServico, CameraServico>();
+
+        // Sprint 21 (ADR 0021/0025/0026/0027/0028) — RBAC Master.
+        services.AddScoped<IUsuarioPropriedadeRepositorio, UsuarioPropriedadeRepositorio>();
+        services.AddScoped<IUsuarioPropriedadePermissaoRepositorio, UsuarioPropriedadePermissaoRepositorio>();
+        services.AddScoped<IPropriedadeFeatureFlagRepositorio, PropriedadeFeatureFlagRepositorio>();
+        services.AddScoped<IModeloEquipamentoRepositorio, ModeloEquipamentoRepositorio>();
+        services.AddScoped<IProvisionamentoRepositorio, ProvisionamentoRepositorio>();
+        services.AddScoped<IAuditoriaMasterRepositorio, AuditoriaMasterRepositorio>();
+        services.AddScoped<IAuditoriaService, AuditoriaService>();
+        services.AddScoped<IPermissaoService, PermissaoService>();
+        services.AddScoped<IUsuarioInternoServico, UsuarioInternoServico>();
+        services.AddScoped<IModeloEquipamentoServico, ModeloEquipamentoServico>();
+        services.AddScoped<IProvisionamentoServico, ProvisionamentoServico>();
+        services.AddScoped<IPropriedadeFeatureFlagServico, PropriedadeFeatureFlagServico>();
+        services.AddScoped<IUsuarioPropriedadePermissaoServico, UsuarioPropriedadePermissaoServico>();
+        services.AddScoped<IImpersonationServico, ImpersonationServico>();
         services.AddScoped<IConsultaDashboardServico, ConsultaDashboardServico>();
         services.AddScoped<IFonteEventos, JflFonteEventos>();
         services.AddScoped<IFonteEventos, EquipamentoFonteEventos>();

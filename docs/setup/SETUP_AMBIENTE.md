@@ -130,6 +130,14 @@ npx expo start
 Aponte a URL base da Api (`src/api/client.ts` ou equivalente) para o host/porta onde o Backend
 está rodando.
 
+### Gerando um build EAS (preview/production)
+
+`mobile/eas.json` define `EXPO_PUBLIC_API_URL` por perfil de build — é um valor de *build-time*
+(a EAS lê direto deste arquivo, não do `.env` local). O valor versionado é um placeholder
+(`http://SEU_IP_LOCAL:5027`) de propósito — antes de rodar `eas build`, substitua pelo IP da sua
+própria máquina na rede local (`ipconfig`/`ifconfig`), nunca commitando o IP real de volta ao
+repositório.
+
 ## 6. Dados de teste (seed de desenvolvimento)
 
 Em ambiente Development, a Api roda automaticamente um seed idempotente logo após subir e depois
@@ -146,11 +154,15 @@ derruba a Api (mesma filosofia do JFL Server: serviço secundário, erro só é 
 | Supervisor | Carlos Henrique | `carlos.henrique@appmorador.local` | `Supervisor@123` |
 | Operador | Juliana Souza | `juliana.souza@appmorador.local` | `Operador@123` |
 | Morador | Fernanda Oliveira | `fernanda.oliveira@appmorador.local` | `Morador@123` |
+| Master (RBAC, Sprint 21) | Master AppMorador | `master@appmorador.local` | `Master@123` |
 
-**Importante**: o domínio hoje **não tem** sistema de Papel/Perfil (ver `docs/DIVIDA_TECNICA.md`
-item 6) — as 4 contas são funcionalmente idênticas, os nomes só dão variedade realista aos dados
-de teste. Logar com qualquer uma delas mostra o mesmo tipo de tela; nenhuma tem permissão
-diferente das outras.
+**Importante**: as 4 primeiras contas (Administrador/Supervisor/Operador/Morador) continuam
+funcionalmente idênticas entre si — são todas clientes (nenhuma tem `RoleGlobal`), os nomes só dão
+variedade realista aos dados de teste. Desde a Sprint 21 (ADR 0021/0025) o domínio **tem** um
+sistema real de RBAC (papéis internos Master/Técnico/Suporte + Permissões Funcionais/Feature
+Flags por propriedade) — a conta **Master** acima é a única com acesso aos endpoints internos
+(`/api/usuarios-internos`, `/api/auditoria`, impersonation). Ver `docs/DIVIDA_TECNICA.md` item 6
+(ainda válido para CRUD completo de usuário cliente/Morador com login próprio).
 
 Só a conta **Morador** (Fernanda Oliveira) tem dados de propriedade vinculados, por ser a única
 persona com sentido de "dona de propriedade" no modelo atual (produto B2C self-service):
