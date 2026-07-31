@@ -222,9 +222,44 @@
   5 telas, `GET /api/properties` enriquecido com perfil/permissões/features. 43 novos testes de
   backend (87 total) + 16 novos testes de mobile (57 total), zero regressão. Painel Web fica fora
   de escopo (Sprint 22). Ver ADRs 0021/0025/0026/0027/0028 e `docs/audits/AUDIT_RBAC_021.md`.
+- **Sprint 22A — Fundação do Painel Web** — projeto novo `PainelWeb/` (React 19 + Vite + TS +
+  Zustand + TanStack Query + MUI). Autenticação, Dashboard Operacional (Master/Suporte) e Técnico,
+  Clientes (lista/detalhe), módulo Suporte (impersonation ponta a ponta com banner/timer, Sessões
+  Ativas inferidas via Auditoria, Diagnóstico da Propriedade, Logs). Achado crítico: bug de
+  `MapInboundClaims` fazia toda Policy de papel interno falhar com 403 desde a Sprint 21, corrigido
+  nesta Fase 0. 3 endpoints novos no backend (`/api/proprietarios`, `/api/proprietarios/{id}`,
+  `/api/dashboard-operacional`) — gaps genuínos, não "1 micro-endpoint" como a missão assumia.
+  Sessões Ativas sem revogação real de token (impersonation é stateless); CRUD completo de cliente
+  fica fora de escopo (sem endpoint de gestão de conta cliente). 9 novos testes de backend (96
+  total) + 28 testes de Painel Web, zero regressão. Ver ADRs 0029/0030 e
+  `docs/painel/mapeamento-api.md`.
+- **Sprint 22B — Equipamentos, Provisionamentos e Diagnóstico** — três módulos administrativos
+  novos no Painel Web. Equipamentos: CRUD global paginado (`api/painel/equipamentos`), Número de
+  Série único por Propriedade, `EstadoOperacionalEquipamento` novo (paralelo a `StatusEquipamento`,
+  conectividade). Provisionamentos: `VinculoEquipamentoPropriedade` (entidade nova, deliberadamente
+  separada do `Provisionamento` já existente da Sprint 21/ADR 0028), regra de 1 vínculo ativo por
+  equipamento garantida em Servico, troca sempre encerra o antigo + cria novo preservando
+  histórico, tudo auditado. Diagnóstico: `GET /api/diagnostico/equipamentos/status` estritamente
+  somente leitura, agregando 3 tabelas numa única consulta projetada. CorrelationId/UsuarioId
+  passam a enriquecer todo log estruturado. 20 novos testes de backend (116 total) + 24 novos
+  testes de Painel Web (52 total), zero regressão — homologação formal completa registrada em
+  `docs/testing/Sprint22B.md`. Frontend do Painel Web (módulos Equipamentos/Provisionamentos/
+  Diagnóstico) entregue na mesma Sprint. Ver ADR 0031.
 
 ## Próximo
 
+- **Sprint 22C — Plataforma de Execução de Comandos de Hardware**: ainda não iniciada. Decisão
+  arquitetural já aprovada pela ARB (ADR 0033, Rev. 2) — `ProviderType`/`HardwareCommandType`
+  como identificadores estáveis (não strings soltas), Command Registry central
+  (capability→payload→converter→handler), idempotência com janela explícita
+  (`IdempotencyExpiresAt`, sem a armadilha de `DATE(CriadoEm)`), `ExecutionPipeline` com
+  curto-circuito/ordem formalizados, `MockProvider` validado contra 3 naturezas de equipamento
+  (JFL/DVR/Control iD). Vai substituir os mocks visuais do módulo Diagnóstico (Sprint 22B) por
+  execução real, equipamento por equipamento. Pontos ainda em aberto para o início da
+  implementação (registrados na própria ADR, não bloqueantes): tradução do schema de
+  PostgreSQL para MySQL, relação entre a nova trilha `AuditoriaComandos` e as trilhas de
+  auditoria já existentes (`AuditoriaMaster`/`HistoricoX`), e mapeamento das novas permissões
+  para o RBAC já existente (`PermissaoFuncionalidade`/`Policies`) em vez de um sistema paralelo.
 - **v0.3.0-alpha**: marco de estabilização atingido na Sprint 3.1 — base executável, previsível e
   documentada para homologação manual.
 - **Release 0.9.0**: ponto de restauração completo atingido na Sprint 17.5 — Release do GitHub

@@ -88,6 +88,9 @@ public class AppDbContext : DbContext
 
     public DbSet<AuditoriaMaster> AuditoriaMaster => Set<AuditoriaMaster>();
 
+    // Sprint 22B (ADR 0031)
+    public DbSet<VinculoEquipamentoPropriedade> VinculosEquipamentoPropriedade => Set<VinculoEquipamentoPropriedade>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Central>()
@@ -477,6 +480,38 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<Equipamento>()
             .Property(e => e.Status)
             .HasConversion<string>();
+
+        modelBuilder.Entity<Equipamento>()
+            .Property(e => e.EstadoOperacional)
+            .HasConversion<string>();
+
+        // Sprint 22B (ADR 0031) — "Numero de Serie" (coluna real: Identificador, nunca
+        // renomeada — ver ADR 0031 sobre por que nao renomear um campo ja usado pela
+        // correlacao de sessao JFL) unico por Propriedade. MySQL/InnoDB nao considera dois
+        // NULLs iguais num indice unico, entao equipamentos sem Identificador continuam
+        // permitidos (nem todo fabricante expoe um, ver Equipamento.cs).
+        modelBuilder.Entity<Equipamento>()
+            .HasIndex(e => new { e.PropriedadeId, e.Identificador })
+            .IsUnique();
+
+        // Sprint 22B (ADR 0031) — vínculo Equipamento<->Propriedade com histórico. FK Restrict
+        // nos dois lados (mesmo padrão de Equipamento/EventoEquipamento acima) — nunca cascade,
+        // o histórico de vínculo tem que sobreviver mesmo que o equipamento/propriedade seja
+        // excluído logicamente.
+        modelBuilder.Entity<VinculoEquipamentoPropriedade>()
+            .HasOne(v => v.Equipamento)
+            .WithMany()
+            .HasForeignKey(v => v.EquipamentoId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<VinculoEquipamentoPropriedade>()
+            .HasOne(v => v.Propriedade)
+            .WithMany()
+            .HasForeignKey(v => v.PropriedadeId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<VinculoEquipamentoPropriedade>()
+            .HasIndex(v => v.EquipamentoId);
 
         // EventoEquipamento e auditoria pura (mesmo espirito de Ocorrencia): sem soft
         // delete, sem query filter — nunca excluido.

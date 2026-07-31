@@ -2,6 +2,177 @@
 
 Registro cronológico das mudanças relevantes do projeto. Cada Sprint/Fase adiciona uma entrada.
 
+## [Sprint 22C.2 — Cadastro de Equipamentos por Fabricante] — 2026-07-30
+
+Objetivo: substituir o formulário genérico de cadastro de Equipamentos (Sprint 22B) por um
+fluxo condicional por Fabricante — cada integração tem seu próprio método de conexão e
+descoberta, nunca um único formulário IP/Usuário/Senha forçado para todos.
+
+### Adicionado (backend)
+- `Equipamento.InformacoesDescobertasJson`/`UltimaDescobertaUtc` — dicionário livre (JSON) com o
+  que o Provider de cada fabricante realmente devolveu (nunca um conjunto fixo de colunas —
+  cada fabricante descobre coisas diferentes). Migration `Sprint22C2_EquipamentoDescoberta`,
+  puramente aditiva.
+- `IEquipamentoRepositorio.GetByFabricanteEIdentificadorAsync` — busca cross-propriedade por
+  Fabricante+Número de Série, único ponto usado pelo novo observador JFL.
+- `EquipamentoAdminServico.CriarAsync`/`AtualizarAsync` passam a validar e persistir de forma
+  condicional por Fabricante: JFL exige só Número de Série (Ip/Porta/Usuário/Senha são sempre
+  ignorados, mesmo se enviados); Control iD exige Ip/Porta/Usuário/Senha e, após salvar, conecta
+  automaticamente e persiste só os campos reais que `IControlIdProvider.ConsultarInformacoesAsync`
+  devolveu (Versão/Nome do Dispositivo/Número de Série — não existe Firmware/Hardware/Hostname
+  nesta integração); Intelbras exige Ip/Porta/Senha (sem Usuário) e só testa a conexão (sem
+  descoberta de dispositivo, por não existir na integração real). Uma falha de conexão nunca
+  reprova o cadastro — só marca o equipamento como Offline.
+- `EquipamentoJflConexaoObserver` (novo `IHostedService`, `Infrastructure/Jfl/`) — assina o evento
+  `SessionManager.SessaoRegistrada` (já existente em `AppMorador.Jfl`, nenhuma mudança no
+  protocolo) e, quando uma central conecta, localiza o Equipamento por Número de Série e marca
+  Online + MAC/Modelo/Firmware descobertos no handshake. Nunca abre conexão TCP de saída.
+- Fabricantes sem Provider real (Hikvision/Dahua/Outro) são recusados explicitamente no cadastro
+  (`409`), em vez de aceitar um registro que nunca vai conectar/descobrir nada de verdade.
+- 13 novos testes de backend (`EquipamentoAdminServicoTests` condicionais por fabricante,
+  `EquipamentoJflConexaoObserverTests` — 129 no total).
+
+### Adicionado (Painel Web)
+- `EquipamentoFormDialog` reescrito: campos exibidos mudam conforme o Fabricante selecionado
+  (JFL: só Número de Série; Control iD: Ip/Porta/Usuário/Senha; Intelbras: Ip/Porta/Senha).
+  Edição de Senha é opcional (em branco mantém a senha atual).
+- `DetalheEquipamentoDrawer` (novo, somente leitura) — mostra só os campos relevantes ao
+  Fabricante do equipamento mais o que `informacoesDescobertas` realmente contém; nunca um campo
+  vazio só porque outro fabricante possui aquela informação. Clique na linha abre o drawer;
+  um ícone de edição por linha abre o formulário.
+- 5 novos testes de Painel Web (57 no total).
+
+### Decisões de escopo
+- Hikvision permanece sem Provider real — adiado inteiramente (mesmo padrão de "nunca fabricar
+  integração sem fonte verificável" já aplicado a Intelbras/Hikvision em Sprints anteriores).
+- Sem reconexão automática ao editar um equipamento — reconectar é responsabilidade do fluxo de
+  sincronização já existente, não deste formulário.
+
+## [Sprint 22B — Equipamentos, Provisionamentos e Diagnóstico] — 2026-07-29
+
+Objetivo: expandir o Painel Web (fundação da Sprint 22A) com três módulos administrativos:
+gestão global de Equipamentos, alocação Equipamento↔Propriedade ("Provisionamento" na linguagem
+de negócio) e Diagnóstico operacional somente leitura. Ver ADR 0031.
+
+### Adicionado (backend)
+- `EstadoOperacionalEquipamento` (Ativo/EmManutencao/Inativo/Defeituoso) — campo novo, paralelo a
+  `StatusEquipamento` (conectividade), nunca combinado com ele.
+- Índice único composto `(PropriedadeId, Identificador)` em `Equipamentos` — Número de Série único
+  por Propriedade (não existe conceito de "Tenant" no domínio). `Identificador` não foi renomeado
+  (usado pela correlação de sessão TCP do JFL); o nome de negócio "Número de Série" só aparece na
+  camada de DTO do Painel Web.
+- `GET/GetById/POST/PUT/PATCH(estado-operacional)/DELETE api/painel/equipamentos` —
+  `EquipamentosAdminController`, cross-propriedade, Master/Técnico-only, paginado, soft delete.
+  Rota deliberadamente separada de `api/equipamentos` (Mobile) — zero mudança no contrato mobile.
+- Nova entidade `VinculoEquipamentoPropriedade` (namespace `Painel.VinculosEquipamento`,
+  deliberadamente separado do `Provisionamento` já existente, ADR 0028) — vínculo com histórico
+  entre Equipamento e Propriedade. "Disponível"/"Provisionado" é derivado de `DataFimUtc == null`,
+  nunca um campo próprio.
+- `GET/POST/POST(trocar)/DELETE api/painel/provisionamentos` — `ProvisionamentosAdminController`:
+  provisionar, trocar (encerra o vínculo antigo + cria um novo, nunca edita em lugar), desvincular,
+  histórico por equipamento, dashboard de alocação. Regra de "1 vínculo ativo por equipamento"
+  garantida no Servico. Toda ação audita via `IAuditoriaService` (ADR 0021).
+- `GET api/diagnostico/equipamentos/status` — `DiagnosticoController`, estritamente somente
+  leitura, agregando Equipamento + StatusCentralJfl + EventoEquipamento numa única consulta
+  projetada (evita N+1).
+- `CorrelationIdMiddleware` (header `X-Correlation-Id`, aceito ou gerado) +
+  `UsuarioLogadoEnrichmentMiddleware` (enriquece o escopo de log com o usuário autenticado) —
+  logs de console agora incluem CorrelationId/UsuarioId via `BeginScope`.
+- Migration `Sprint22BEquipamentosProvisionamentos`: 3 colunas novas em `Equipamentos`
+  (`EstadoOperacional`, `MacAddress`, `Observacoes`), troca de tipo de `Identificador`
+  (`longtext`→`varchar(255)`, necessária para o índice), tabela nova `VinculosEquipamentoPropriedade`.
+  Validada contra o banco real antes de aplicar (sem duplicatas, sem risco de truncamento).
+- 20 novos testes de backend (`EquipamentoAdminServicoTests`, `VinculoEquipamentoServicoTests`,
+  `DiagnosticoServicoTests` — 116 no total).
+
+### Adicionado (Painel Web)
+- Nova estrutura modular `src/compartilhado/{componentes,hooks,tipos}/` +
+  `src/modulos/{equipamentos,provisionamentos,diagnostico}/{queries,mutations,queryKeys,
+  adaptadores,types}/` — aplicada só aos 3 módulos novos (Dashboard/Clientes/Suporte continuam na
+  estrutura flat da Sprint 22A, por decisão explícita do usuário).
+- Componentes compartilhados novos: `CabecalhoPagina`, `BarraPesquisa`, `PaginacaoPadrao`,
+  `TabelaPadrao` (genérica por colunas), `BadgeStatus`/`SeletorStatus`, `SeletorPropriedade`
+  (busca cliente → escolhe propriedade, cascata sobre endpoints já existentes — não existe nem
+  foi criado um endpoint "listar todas as propriedades").
+- Módulo Equipamentos: listagem paginada com busca/filtro por Fabricante/Estado Operacional,
+  formulário único de criação/edição (`EquipamentoFormDialog`), exclusão com confirmação.
+- Módulo Provisionamentos: dashboard de alocação (3 cards), wizard de ativação
+  (`ProvisionarDialog`, calcula "disponível" cruzando equipamentos × vínculos ativos no cliente),
+  troca de equipamento (`TrocarDialog`), histórico completo por equipamento (`HistoricoDrawer`).
+- Módulo Diagnóstico: grid de status com seletor de polling (Desligado/10s/30s/60s, padrão 30s),
+  drawer de detalhe com último ping/eventos recentes e botões de ação de hardware **desabilitados**
+  (mock visual — comunicação real fica para a Sprint 22C).
+- Sidebar/rotas: 3 itens novos (Equipamentos/Provisionamentos/Diagnóstico de Equipamentos),
+  visíveis só para Master/Técnico (`podeGerenciarHardware`, novo em `usePermissao`).
+- 24 novos testes de Painel Web (52 no total: 28 já existentes + 24 novos).
+
+### Decisões de escopo (ver ADR 0031)
+- Nenhum ADR 0032 foi criado para "Sessões Ativas" — o ADR 0029 já documenta isso integralmente;
+  duplicar seria contrário ao princípio desta própria Sprint.
+- `ProprietariosController` continua somente leitura — fora de escopo desta Sprint.
+- Diagnóstico não tem nenhuma ação que altere estado — comunicação direta com hardware fica para
+  a Sprint 22C.
+- `DialogoConfirmacao` da missão não foi recriado — o `ConfirmDialog` da Sprint 22A já cobre
+  exatamente o mesmo caso, reaproveitado diretamente pelos 3 módulos novos.
+- `FiltroPeriodo` não foi criado — nenhum dos 3 endpoints novos aceita filtro de período; construir
+  o componente sem um backend real por trás fabricaria uma funcionalidade que não existe (mesmo
+  princípio já aplicado ao filtro de zona cortado na Sprint 3).
+- Não foi criada uma pasta `core/` — o `httpClient`/`extrairMensagemErro` já centralizados desde a
+  Sprint 22A (`src/services/`) já cumprem esse papel; duplicar seria só uma camada extra sem ganho.
+
+## [Sprint 22A — Fundação do Painel Web] — 2026-07-28
+
+Objetivo: fundação do Painel Web (novo projeto `PainelWeb/`, React 19 + Vite + TypeScript) —
+autenticação, layout, Dashboard Operacional/Técnico, gestão de Clientes e o módulo de Suporte
+(impersonation). Consome a Api da Sprint 21 quase sem alteração — 3 endpoints novos, só-leitura,
+para gaps genuínos encontrados na Fase 0 (ver ADR 0029). Ver `docs/painel/mapeamento-api.md`,
+`docs/ARQUITETURA_ATUAL.md` e ADR 0030.
+
+### Adicionado (backend)
+- **Bug crítico corrigido**: `AddJwtBearer` sem `MapInboundClaims = false` fazia toda Policy
+  `RequerMaster/Tecnico/Suporte/Interno` falhar com 403 sempre, mesmo para o Master de verdade —
+  o ASP.NET Core remapeia a claim curta `"role"` para uma URI longa por padrão, e
+  `GetRoleGlobal()` nunca encontrava a claim depois da validação real do token. Nenhum teste da
+  Sprint 21 pegava isso (todos construíam o `ClaimsPrincipal` na mão). Descoberto testando
+  impersonation contra o backend real na Fase 0 desta Sprint.
+- `GET /api/proprietarios` (+ `/{id}` com detalhe e propriedades) — lista global de clientes,
+  Master/Suporte-only. Não existia nenhum endpoint cross-tenant antes desta Sprint.
+- `GET /api/dashboard-operacional` — agregado (total de clientes/propriedades/equipamentos,
+  equipamentos offline, novos clientes por mês, propriedades por tipo, equipamentos por status).
+  Aberto a qualquer interno (`RequerInterno`), reaproveitado pelo Dashboard Técnico também.
+- 9 novos testes de backend (102 total: 96 já existentes desta rodada + os 6 já contados +
+  3 do detalhe de cliente — ver `AppMorador.Tests/Painel/`).
+
+### Adicionado (Painel Web)
+- Projeto novo: React 19, Vite, TypeScript, React Router v6, TanStack Query, Axios, Zustand,
+  Material UI v9 (tema claro/escuro com os mesmos Design Tokens do app mobile).
+- Autenticação: login, refresh automático (exceto durante impersonation), guards de rota
+  (`PrivateRoute`/`RoleRoute`), sessão expirada com redirect suave.
+- Dashboard Operacional (Master/Suporte): cards de ação imediata, gráficos (Recharts), atividade
+  recente (via Auditoria).
+- Dashboard Técnico: escopo reduzido de forma honesta — "Minhas Instalações"/"Meus Clientes" não
+  têm vínculo Técnico↔Provisionamento no domínio (dívida técnica registrada, ver ADR 0029), em vez
+  de dado fabricado.
+- Clientes: lista paginada + busca (debounce 300ms) + detalhe com propriedades vinculadas.
+  Criar/Editar/Desativar cliente não existem nesta Sprint (sem endpoint — cliente só se
+  autocadastra).
+- Suporte: impersonation ponta a ponta (banner laranja fixo com timer regressivo, "Entrar como
+  Cliente" por propriedade específica), Diagnóstico da Propriedade (câmeras/heartbeat/eventos,
+  100% reaproveitando endpoints já ownership-checked do cliente), Sessões Ativas (inferidas do log
+  de Auditoria — sem revogação real de token, decisão explícita), Logs (Auditoria filtrável).
+- UX: skeletons em toda tela de carregamento, estados vazios com CTA, toast global (sucesso/erro/
+  aviso), confirmação em ações sensíveis, responsivo (mobile mostra tela "use um computador").
+- 28 testes automatizados (Vitest + React Testing Library — stores, hooks, guards de rota,
+  componentes).
+- `npm run build`: zero erros/warnings de tipo; `npm run lint`: zero problemas.
+
+### Decisões de escopo (ver ADR 0029/0030)
+- Painel Web usa Vitest em vez de Jest (integração nativa com Vite).
+- Zustand substitui a pasta `contexts/` da missão original (redundante em cima de stores).
+- Sessões Ativas não tem "forçar logout" real — impersonation é 100% stateless, revogar um token
+  já emitido exigiria um mecanismo que não existe.
+- "Propriedades por Status" virou "Propriedades por Tipo" — `Propriedade` não tem campo de status.
+
 ## [Sprint 21 — RBAC Master (Base de Permissões da Plataforma)] — 2026-07-26
 
 Objetivo: base de autorização para AppMorador + futuro Painel Web — papéis internos (Master/

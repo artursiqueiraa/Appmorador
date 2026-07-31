@@ -25,6 +25,10 @@ using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Sprint 22B (ADR 0031) — habilita a impressão de BeginScope (CorrelationId, UsuarioId) nos
+// logs de console; sem isso os escopos abertos pelos middlewares abaixo ficam inertes.
+builder.Logging.AddSimpleConsole(options => options.IncludeScopes = true);
+
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection nao configurada.");
 
@@ -63,6 +67,18 @@ builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
+        // Sprint 21 (ADR 0021) bugfix — sem isto, o ASP.NET Core remapeia a claim
+        // "role" (nome curto emitido por JwtTokenService) para a URI longa
+        // ClaimTypes.Role por padrao (MapInboundClaims=true e o default), e
+        // ClaimsPrincipalExtensions.GetRoleGlobal() (que procura literalmente
+        // "role") nunca encontra nada — toda Policy RequerMaster/Tecnico/Suporte/
+        // Interno ficava bloqueando ATE o Master de verdade (403 sempre), sem
+        // nenhum teste pegar isso (os testes de ClaimsPrincipalExtensions
+        // construiam o ClaimsPrincipal na mao, sem passar pelo pipeline real do
+        // JwtBearerHandler). Descoberto na Fase 0 da Sprint 22A testando
+        // impersonation contra o backend real.
+        options.MapInboundClaims = false;
+
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
@@ -183,7 +199,14 @@ builder.Services.AddControllers()
 if (builder.Environment.IsDevelopment())
 {
     builder.Services.AddEndpointsApiExplorer();
-    builder.Services.AddSwaggerGen();
+    builder.Services.AddSwaggerGen(options =>
+    {
+        // Sprint 22B (ADR 0031) — inclui os comentários /// dos Controllers/DTOs no Swagger UI
+        // (descrições de endpoint, request/response). Arquivo sempre existe (GenerateDocumentationFile
+        // habilitado no .csproj), então nenhuma checagem de existência é necessária aqui.
+        var xmlPath = Path.Combine(AppContext.BaseDirectory, $"{typeof(Program).Assembly.GetName().Name}.xml");
+        options.IncludeXmlComments(xmlPath);
+    });
 }
 
 // --- Alarme JFL + Snapshot (fases anteriores, sem alteracao de comportamento) ----
@@ -200,6 +223,11 @@ builder.Services.AddJflServer(options =>
 builder.Services.AddScoped<AppMorador.Infrastructure.Jfl.AlarmEventProcessor>();
 builder.Services.AddSingleton<IJflCommandHandler, AppMorador.Infrastructure.Jfl.EventoCommandHandler>();
 builder.Services.AddHostedService<JflServerHostedService>();
+
+// Sprint 22C.2 — hook de conexão JFL: marca o Equipamento correspondente como Online +
+// descoberta automática quando a central termina o handshake (SessaoRegistrada). Puramente
+// aditivo sobre AppMorador.Jfl (nenhuma mudança no protocolo em si).
+builder.Services.AddHostedService<AppMorador.Infrastructure.Jfl.EquipamentoJflConexaoObserver>();
 
 // Captura de snapshot (disco local, sem nuvem) — chamada pelo AlarmEventProcessor
 // depois que a Ocorrencia ja foi criada.
@@ -239,8 +267,11 @@ using (var migrationScope = app.Services.CreateScope())
     }
 }
 
-// Ordem importa: excecao/headers primeiro (envolvem tudo), depois HTTPS/CORS/rate
-// limit, depois autenticacao/autorizacao, so entao os controllers.
+// Ordem importa: CorrelationId primeiro (envolve tudo, inclusive erros antes da
+// autenticacao), depois excecao/headers, depois HTTPS/CORS/rate limit, depois
+// autenticacao/autorizacao (so entao UsuarioLogadoEnrichmentMiddleware, que precisa
+// de HttpContext.User ja populado), so entao os controllers.
+app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseMiddleware<SecurityHeadersMiddleware>();
 
@@ -279,6 +310,7 @@ app.UseCors("Default");
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseMiddleware<UsuarioLogadoEnrichmentMiddleware>();
 app.MapControllers();
 
 // Sprint 14 (ADR 0017) — transporte em tempo real da Camada Operacional (ADR 0016).

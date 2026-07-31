@@ -100,9 +100,9 @@ internal sealed class JflProvider : IJflProvider
 
     private static ResultadoComandoJfl ParaResultadoComando(
         bool sucesso, string? erro, CentralStatusResponse? statusResultante) => new()
-    {
-        Sucesso = sucesso,
-        MensagemErro = erro,
-        StatusResultante = statusResultante is not null ? JflStatusMapper.ParaStatusCentralJflInfo(statusResultante) : null,
-    };
+        {
+            Sucesso = sucesso,
+            MensagemErro = erro,
+            StatusResultante = statusResultante is not null ? JflStatusMapper.ParaStatusCentralJflInfo(statusResultante) : null,
+        };
 }

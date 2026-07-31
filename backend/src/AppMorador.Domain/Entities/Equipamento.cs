@@ -57,10 +57,37 @@ public class Equipamento : EntidadeComSoftDelete
     /// <summary>Identificador interno do equipamento no fabricante (ex.: número de série) — opcional, nem todo fabricante expõe um.</summary>
     public string? Identificador { get; set; }
 
+    /// <summary>Sprint 22B — endereço físico da interface de rede, opcional (nem todo equipamento expõe/precisa).</summary>
+    public string? MacAddress { get; set; }
+
+    /// <summary>Sprint 22B — anotação livre do Técnico/Master sobre o equipamento (cadastro no Painel Web).</summary>
+    public string? Observacoes { get; set; }
+
     public required StatusEquipamento Status { get; set; }
+
+    /// <summary>
+    /// Sprint 22B (ADR 0031) — estado administrativo/de ciclo de vida (Ativo/EmManutencao/
+    /// Inativo/Defeituoso), decidido por um Técnico/Master via Painel Web — nunca confundir com
+    /// <see cref="Status"/> (conectividade). Default Ativo para equipamentos já cadastrados
+    /// (backfill na migration) e para novos cadastros.
+    /// </summary>
+    public EstadoOperacionalEquipamento EstadoOperacional { get; set; } = EstadoOperacionalEquipamento.Ativo;
 
     /// <summary>Preenchida só por uma sincronização manual bem-sucedida — nunca por job automático (fora de escopo).</summary>
     public DateTime? UltimaSincronizacaoUtc { get; set; }
+
+    /// <summary>
+    /// Sprint 22C.2 — dicionário chave/valor (serializado em JSON) com o que o Provider do
+    /// fabricante conseguiu descobrir de verdade sobre o equipamento (ex.: Control iD:
+    /// Firmware/Hostname; JFL: Modelo/MAC, vindos do handshake da central). Deliberadamente
+    /// livre (não um conjunto fixo de colunas) porque cada fabricante descobre coisas
+    /// diferentes, e a lista de fabricantes cresce — nunca inventar aqui um campo que o
+    /// Provider não devolveu de verdade (ver ADR 0031, mesmo princípio de nunca fabricar dado).
+    /// </summary>
+    public string? InformacoesDescobertasJson { get; set; }
+
+    /// <summary>Quando `InformacoesDescobertasJson` foi preenchido pela última vez — nulo se nunca houve descoberta automática bem-sucedida.</summary>
+    public DateTime? UltimaDescobertaUtc { get; set; }
 
     public required DateTime CreatedAtUtc { get; set; }
 }

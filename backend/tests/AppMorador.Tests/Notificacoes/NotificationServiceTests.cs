@@ -19,18 +19,18 @@ public class NotificationServiceTests
 
     private static DispositivoPush NovoDispositivo(
         Guid usuarioId, string token, bool ativo = true, bool notificarAlertas = true, bool notificarAtividades = true, bool notificarGeral = true) => new()
-    {
-        Id = Guid.NewGuid(),
-        UsuarioId = usuarioId,
-        Plataforma = PlataformaDispositivo.Android,
-        Token = token,
-        Ativo = ativo,
-        NotificarAlertas = notificarAlertas,
-        NotificarAtividades = notificarAtividades,
-        NotificarGeral = notificarGeral,
-        UltimoUsoUtc = DateTime.UtcNow,
-        CreatedAtUtc = DateTime.UtcNow,
-    };
+        {
+            Id = Guid.NewGuid(),
+            UsuarioId = usuarioId,
+            Plataforma = PlataformaDispositivo.Android,
+            Token = token,
+            Ativo = ativo,
+            NotificarAlertas = notificarAlertas,
+            NotificarAtividades = notificarAtividades,
+            NotificarGeral = notificarGeral,
+            UltimoUsoUtc = DateTime.UtcNow,
+            CreatedAtUtc = DateTime.UtcNow,
+        };
 
     private static NotificacaoPayload NovoPayload(Guid propriedadeId, EventoNotificacaoTipo tipo = EventoNotificacaoTipo.AlarmeDisparado) => new()
     {

@@ -9,6 +9,12 @@ public interface IPropriedadeRepositorio
 
     Task<IReadOnlyList<Propriedade>> ListByOwnerAsync(Guid proprietarioId, CancellationToken cancellationToken);
 
+    /// <summary>Sprint 22A (ADR 0029) — total de propriedades por Tipo, para o Dashboard Operacional.</summary>
+    Task<IReadOnlyDictionary<TipoPropriedade, int>> ContarPorTipoAsync(CancellationToken cancellationToken);
+
+    /// <summary>Sprint 22A (ADR 0029) — quantidade de propriedades por dono, para a listagem de clientes (coluna "Propriedades").</summary>
+    Task<IReadOnlyDictionary<Guid, int>> ContarPorProprietariosAsync(IReadOnlyCollection<Guid> proprietarioIds, CancellationToken cancellationToken);
+
     Task AddAsync(Propriedade propriedade, CancellationToken cancellationToken);
 
     Task SaveChangesAsync(CancellationToken cancellationToken);

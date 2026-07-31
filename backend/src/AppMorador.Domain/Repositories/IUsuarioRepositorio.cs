@@ -14,6 +14,20 @@ public interface IUsuarioRepositorio
 
     Task<bool> ExisteAlgumMasterAsync(CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Sprint 22A (ADR 0029) — clientes da plataforma (RoleGlobal nulo — nunca inclui contas
+    /// internas), paginado, com busca opcional por nome/e-mail. Master/Suporte-only (ver
+    /// Policies.RequerSuporte no Controller).
+    /// </summary>
+    Task<(IReadOnlyList<Usuario> Itens, int Total)> ListProprietariosAsync(
+        int pagina, int tamanhoPagina, string? busca, CancellationToken cancellationToken);
+
+    /// <summary>Sprint 22A (ADR 0029) — total de clientes (RoleGlobal nulo) para o Dashboard Operacional.</summary>
+    Task<int> ContarClientesAsync(CancellationToken cancellationToken);
+
+    /// <summary>Sprint 22A (ADR 0029) — novos clientes por mês, últimos N meses (chave "AAAA-MM").</summary>
+    Task<IReadOnlyDictionary<string, int>> ContarClientesPorMesAsync(int meses, CancellationToken cancellationToken);
+
     Task AddAsync(Usuario usuario, CancellationToken cancellationToken);
 
     /// <summary>Busca um refresh token ativo ou nao pelo hash — quem chama decide o que fazer com o estado.</summary>

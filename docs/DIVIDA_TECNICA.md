@@ -952,3 +952,141 @@ pasta `snapshots/` manualmente.
 
 **Sugestão de resolução**: se algum dia importar, estender `ISnapshotStorage.SaveAsync` para
 aceitar uma extensão explícita, ou gerar o placeholder do seed como JPEG de verdade.
+
+## 45. `Provisionamento` sem vínculo a um Técnico responsável (Sprint 22A)
+
+**Descrição**: O Dashboard Técnico do Painel Web pediria "Minhas Instalações" (provisionamentos
+atribuídos ao técnico logado), mas `Provisionamento` (ADR 0028) não tem nenhum campo de
+responsável — só `PropriedadeId/Nome/Template/Status`. Não há também nenhum endpoint que liste
+Provisionamentos cross-propriedade (só por propriedade específica).
+
+**Motivo**: adicionar essa atribuição exigiria uma migration nova + endpoint de listagem global,
+além do "mínimo necessário" combinado para a Sprint 22A (ver ADR 0029).
+
+**Impacto**: Dashboard Técnico mostra um estado honesto explicando a limitação em vez de dado
+fabricado — nenhuma funcionalidade quebrada, só incompleta.
+
+**Prioridade**: média — sobe quando o produto realmente precisar de atribuição de técnico por
+instalação (provavelmente junto do wizard de provisionamento com templates, Sprint 22B+).
+
+**Sugestão de resolução**: adicionar `TecnicoResponsavelId` (nullable) a `Provisionamento` +
+endpoint `GET /api/provisionamentos?tecnicoId=` (ou similar) cross-propriedade.
+
+**Reavaliado na Sprint 22B (ADR 0031)**: continua em aberto para a entidade `Provisionamento`
+(ADR 0028) — não foi alterada nesta Sprint. A Sprint 22B criou uma entidade diferente
+(`VinculoEquipamentoPropriedade`, o vínculo Equipamento↔Propriedade) que já nasce com
+`CriadoPorUsuarioId` obrigatório e auditável, então não repete esta lacuna para o conceito novo;
+nenhuma tabela associativa adicional foi necessária para isso.
+
+## 46. Sessões de impersonation não são revogáveis (Sprint 22A)
+
+**Descrição**: Impersonation é 100% stateless (JWT auto-contido, ver ADR 0021) — não existe
+nenhum registro de "sessão ativa" persistido nem mecanismo de revogação de um token já emitido. A
+tela "Sessões Ativas" do Painel Web infere sessões em andamento a partir do log de Auditoria
+(Início sem Fim correspondente, dentro dos 15min de vida do token), mas **não tem** botão de
+"forçar logout" funcional.
+
+**Motivo**: implementar revogação real exigiria uma blocklist de token (ou trocar para sessões
+persistidas no servidor) — mudança arquitetural maior que o escopo combinado para esta Sprint (ver
+ADR 0029).
+
+**Impacto**: um Master/Suporte não consegue encerrar à força a sessão de impersonation de OUTRO
+Master/Suporte. Na prática, o token expira sozinho em 15 minutos de qualquer forma.
+
+**Prioridade**: baixa — o dano potencial já é limitado pelo teto de 15 minutos.
+
+**Sugestão de resolução**: se o produto precisar disso de verdade, avaliar uma blocklist de
+`jti` (Guid do token) com TTL igual ao tempo de vida restante do token, verificada no pipeline de
+autenticação.
+
+**Reavaliado na Sprint 22B (ADR 0031)**: a missão desta Sprint pedia documentar num "ADR 0032"
+que Sessões Ativas é baseada em log de auditoria — o ADR 0029 (Sprint 22A) já documenta isso
+integralmente, então nenhum ADR novo foi criado (evitando duplicação). Este item continua a
+referência definitiva do assunto junto com o ADR 0029.
+
+## 47. Sem CRUD de gestão de conta de cliente (Sprint 22A)
+
+**Descrição**: A Fase 5 do Painel Web (Sprint 22A) pedia Criar/Editar/Desativar cliente, mas não
+existe nenhum endpoint para isso — um cliente só nasce via autocadastro (`POST /api/auth/register`).
+O Painel Web implementou só leitura (lista + busca + detalhe).
+
+**Motivo**: construir esse CRUD (validação de documento CPF/CNPJ, edição de plano, desativação)
+seria uma Sprint própria — fora do "mínimo necessário" combinado para a fundação do Painel Web.
+
+**Impacto**: Master/Suporte não conseguem editar/desativar uma conta de cliente pelo Painel Web
+ainda.
+
+**Prioridade**: média — natural para uma Sprint 22B/22C, junto da gestão completa de Propriedades/
+Equipamentos.
+
+**Sugestão de resolução**: endpoints `PUT /api/proprietarios/{id}` e
+`POST /api/proprietarios/{id}/desativar` (Master-only), seguindo o mesmo padrão já usado por
+`UsuariosInternosController`.
+
+**Reavaliado na Sprint 22B (ADR 0031)**: confirmado que `ProprietariosController` continua só
+com `GET` (lista + detalhe) — nenhum endpoint de criação/edição foi adicionado. Fora de escopo
+desta Sprint (que tratou Equipamentos/Provisionamentos/Diagnóstico, não gestão de conta de
+cliente); a interface do Painel Web permanece Somente Leitura com a justificativa já registrada
+acima.
+
+## 48. Regra de "1 vínculo ativo por equipamento" garantida só em código, não no banco (Sprint 22B)
+
+**Descrição**: `VinculoEquipamentoPropriedade` não tem nenhuma constraint de banco impedindo dois
+registros com o mesmo `EquipamentoId` e `DataFimUtc IS NULL` simultaneamente — a regra é garantida
+inteiramente por `VinculoEquipamentoServico` (checagem antes de criar/trocar).
+
+**Motivo**: MySQL/InnoDB não suporta índice único parcial/condicional (ex.: `WHERE DataFimUtc IS
+NULL`) sem uma coluna gerada adicional — implementar isso seria desproporcional ao escopo desta
+Sprint (mesma classe de simplificação já registrada em decisões anteriores do projeto, ex.:
+debounce em memória em vez de Redis).
+
+**Impacto**: um bug futuro no Servico (ou uma escrita direta no banco fora do Servico) poderia, em
+teoria, violar essa regra sem o banco rejeitar. Os testes automatizados
+(`VinculoEquipamentoServicoTests`) cobrem os caminhos de rejeição conhecidos, mas isso não
+substitui uma garantia de banco.
+
+**Prioridade**: baixa — toda escrita nesta tabela hoje passa exclusivamente pelo Servico.
+
+**Sugestão de resolução**: se o volume de escrita justificar, migrar para uma coluna gerada
+(`AtivoFlag` calculada a partir de `DataFimUtc`) + índice único parcial em cima dela.
+
+## 49. `EquipamentoJflConexaoObserver` validado só via teste unitário, nunca contra um handshake JFL real ponta a ponta (Sprint 22C.2)
+
+**Descrição**: o hook que marca um Equipamento JFL como Online ao conectar (`EquipamentoJflConexaoObserver`,
+`Infrastructure/Jfl/`) foi validado via testes unitários diretos (`ProcessarAsync` chamado
+diretamente, sem passar pelo protocolo TCP real) e via subida real da aplicação (confirma que a
+inscrição no evento `SessionManager.SessaoRegistrada` não quebra o startup). Não foi construído um
+pacote JFL bruto (0x21/0x2A) de handshake para simular uma central real conectando na porta 8085
+durante esta Sprint.
+
+**Motivo**: não existe hardware JFL real disponível neste ambiente de desenvolvimento (mesma
+limitação já registrada para outras integrações do projeto), e montar um cliente de protocolo
+binário só para este teste seria desproporcional ao escopo desta Sprint.
+
+**Impacto**: baixo — a lógica de negócio do observador (localizar Equipamento, marcar Online,
+persistir descobertas, nunca lançar) está coberta por teste unitário; o único risco não coberto é
+uma incompatibilidade na integração com o `SessionManager` real sob um handshake genuíno.
+
+**Prioridade**: baixa — o padrão de assinatura de evento é idêntico ao já usado (e validado em
+produção) por `EventoCommandHandler`.
+
+**Sugestão de resolução**: quando uma central JFL física estiver disponível para testes (mesma
+dependência já registrada para a homologação original do protocolo JFL), validar o fluxo completo:
+cadastrar o Equipamento pelo Número de Série, conectar a central física, confirmar Status=Online.
+
+## 50. Sem reconexão automática ao editar um equipamento Control iD/Intelbras (Sprint 22C.2)
+
+**Descrição**: `EquipamentoAdminServico.AtualizarAsync` atualiza Ip/Porta/Usuário/Senha sem tentar
+reconectar/redescobrir informações — só o cadastro (`CriarAsync`) dispara a conexão automática.
+
+**Motivo**: decisão de escopo explícita — reconectar é responsabilidade do fluxo de sincronização
+manual já existente (`EquipamentoIntegracaoServico`, mobile), não deste formulário administrativo.
+
+**Impacto**: baixo — se o Técnico corrigir um IP errado via edição, o equipamento continua
+Offline/com dados desatualizados até uma sincronização manual ou um novo cadastro.
+
+**Prioridade**: baixa.
+
+**Sugestão de resolução**: se o padrão de uso mostrar que Técnicos esperam reconexão automática ao
+editar, replicar a mesma chamada de `ConectarEDescobrirControlIdAsync`/`ConectarIntelbrasAsync` já
+usada em `CriarAsync`.

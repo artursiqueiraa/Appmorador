@@ -13,6 +13,10 @@ using AppMorador.Application.Intelbras;
 using AppMorador.Application.Jfl;
 using AppMorador.Application.Moradores;
 using AppMorador.Application.Operacional;
+using AppMorador.Application.Painel;
+using AppMorador.Application.Painel.Diagnostico;
+using AppMorador.Application.Painel.Equipamentos;
+using AppMorador.Application.Painel.VinculosEquipamento;
 using AppMorador.Application.PermissoesAcesso;
 using AppMorador.Application.PermissoesVeiculares;
 using AppMorador.Application.PontosAcesso;
@@ -95,6 +99,17 @@ public static class AuthServiceCollectionExtensions
         services.AddScoped<IPropriedadeFeatureFlagServico, PropriedadeFeatureFlagServico>();
         services.AddScoped<IUsuarioPropriedadePermissaoServico, UsuarioPropriedadePermissaoServico>();
         services.AddScoped<IImpersonationServico, ImpersonationServico>();
+
+        // Sprint 22A (ADR 0029) — leitura global cross-tenant para o Painel Web (Master/Suporte).
+        services.AddScoped<IProprietarioServico, ProprietarioServico>();
+        services.AddScoped<IDashboardOperacionalServico, DashboardOperacionalServico>();
+
+        // Sprint 22B (ADR 0031) — módulos novos do Painel Web (Equipamentos globais + Provisionamentos).
+        services.AddScoped<IEquipamentoAdminServico, EquipamentoAdminServico>();
+        services.AddScoped<IVinculoEquipamentoPropriedadeRepositorio, VinculoEquipamentoPropriedadeRepositorio>();
+        services.AddScoped<IVinculoEquipamentoServico, VinculoEquipamentoServico>();
+        services.AddScoped<IDiagnosticoEquipamentoRepositorio, DiagnosticoEquipamentoRepositorio>();
+        services.AddScoped<IDiagnosticoServico, DiagnosticoServico>();
         services.AddScoped<IConsultaDashboardServico, ConsultaDashboardServico>();
         services.AddScoped<IFonteEventos, JflFonteEventos>();
         services.AddScoped<IFonteEventos, EquipamentoFonteEventos>();

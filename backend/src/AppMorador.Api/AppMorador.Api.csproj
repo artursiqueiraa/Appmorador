@@ -21,6 +21,13 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>752195b8-1e51-4397-bc77-b66da4cb95f9</UserSecretsId>
+    <!-- Sprint 22B (ADR 0031) — habilita o Swagger a ler os comentários /// já escritos nos
+         Controllers/DTOs. CS1591 (endpoint sem comentário) é suprimido de propósito: exigir
+         comentário em toda a Api existente seria refatoração massiva fora do escopo desta
+         Sprint — Controllers novos já documentados servem de padrão para o restante crescer
+         organicamente. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
 
 </Project>

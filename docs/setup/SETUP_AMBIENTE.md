@@ -1,8 +1,30 @@
 # Setup de Ambiente do Zero
 
 Guia para um desenvolvedor sem contexto prévio clonar o projeto, configurar o banco e rodar
-Backend + Mobile localmente, sem nenhuma alteração manual de código. Escrito na Sprint 3.1
-(homologação/estabilização) e atualizado na tarefa de infraestrutura de ambiente que se seguiu.
+Backend + Painel Web + Mobile localmente, sem nenhuma alteração manual de código. Escrito na
+Sprint 3.1 (homologação/estabilização) e atualizado na tarefa de infraestrutura de ambiente que se
+seguiu, e novamente na Sprint 22C.1 (adição do Painel Web).
+
+## Resumo rápido — rodar os 3 serviços
+
+Cada comando roda num terminal próprio (ficam abertos, não são "fire and forget"). Ordem
+recomendada: backend primeiro (os outros dois dependem dele respondendo em `:5027`).
+
+```bash
+# 1) Backend — a partir de backend/src/AppMorador.Api/
+dotnet run
+
+# 2) Painel Web (frontend admin) — a partir de PainelWeb/
+npm install
+npm run dev
+# abre em http://localhost:5173
+
+# 3) Mobile — a partir de mobile/
+npm install
+npx expo start
+```
+
+Detalhes de cada um (pré-requisitos, variáveis de ambiente, troubleshooting) nas seções abaixo.
 
 ## Banco de dados utilizado
 
@@ -118,7 +140,30 @@ de erro específico, sem derrubar o processo — por design). Swagger fica dispo
 ou a connection string estiver errada, a Api lança uma exceção não tratada e não sobe — é uma
 dependência dura, mesmo critério que `Jwt:Key` ausente, nunca deve ser silenciada.
 
-## 5. Rodar o Mobile
+## 5. Rodar o Painel Web (frontend admin)
+
+A partir de `PainelWeb/`:
+
+```bash
+npm install
+npm run dev
+```
+
+Abre em `http://localhost:5173`. Precisa do Backend já rodando em `http://localhost:5027` (seção
+4) — a URL da Api vem de `PainelWeb/.env` (`VITE_API_URL`, já versionado com o valor local padrão;
+sem essa variável configurada, `httpClient.ts` lança um erro explícito na inicialização e a
+aplicação não sobe, mesmo critério de dependência dura já usado para `Jwt:Key` no Backend). Se
+mudar a porta/host do Backend, ajuste `PainelWeb/.env` (ou `.env.local`, que tem prioridade e não é
+versionado) e também `Cors:AllowedOrigins` em `appsettings.Development.json` do Backend — sem isso
+o navegador bloqueia as requisições por CORS.
+
+**Login**: mesmas contas da tabela da seção 7, mas só contas internas (`Master`/`Técnico`/
+`Suporte`) enxergam o menu completo — hoje só a conta `master@appmorador.local` tem uma dessas
+roles no seed. Uma conta cliente comum (Administrador/Supervisor/Operador/Morador) consegue logar
+no Painel Web (mesma autenticação do Mobile), mas cai numa Dashboard sem dados e sem explicação —
+comportamento conhecido, ver `docs/reviews/FRONTEND_REVIEW_REPORT.md` (Sprint 22C.1, Problema #2).
+
+## 6. Rodar o Mobile
 
 A partir de `mobile/`:
 
@@ -138,7 +183,7 @@ está rodando.
 própria máquina na rede local (`ipconfig`/`ifconfig`), nunca commitando o IP real de volta ao
 repositório.
 
-## 6. Dados de teste (seed de desenvolvimento)
+## 7. Dados de teste (seed de desenvolvimento)
 
 Em ambiente Development, a Api roda automaticamente um seed idempotente logo após subir e depois
 de aplicar as migrations (`AppMorador.Infrastructure.Persistence.Seed.DevelopmentSeeder`,
