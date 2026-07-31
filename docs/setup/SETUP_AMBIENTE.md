@@ -32,12 +32,23 @@ Detalhes de cada um (pré-requisitos, variáveis de ambiente, troubleshooting) n
 suporte a SQL Server ou outro provider — a connection string e o EF Core estão configurados
 especificamente para MySQL (`ServerVersion.AutoDetect`).
 
+- No Windows, o servidor roda como o serviço `MySQL80` (`Get-Service MySQL80` /
+  `net start MySQL80` / `net stop MySQL80`).
+- Porta padrão: **3306**.
+- A aplicação **nunca** se conecta como `root` — o usuário de runtime é um usuário restrito
+  (`appmorador`, ver seção 1 abaixo), com privilégios só sobre o próprio banco `appmorador`. O
+  usuário `root` existe apenas para tarefas administrativas manuais (criar o banco, criar o
+  usuário restrito, apagar/recriar o ambiente) — nunca é usado pela aplicação em nenhum ambiente.
+
 ## Pré-requisitos
 
+- Windows (guia validado em Windows; comandos de banco/terminal assumem isso)
 - .NET 8 SDK
-- MySQL Server 8.0+
-- Node.js 18+ e Expo CLI (`npx expo`) para o Mobile
+- Node.js 18+ e npm (Node já inclui o npm)
+- MySQL Community Server 8.0 — no Windows, instalado como serviço `MySQL80`
+- Git
 - Ferramenta `dotnet-ef` instalada globalmente: `dotnet tool install --global dotnet-ef`
+- Expo CLI (`npx expo`, via `npx` — não precisa instalar global) para o Mobile
 
 ## 1. Banco de dados — criação do banco vazio (passo manual único)
 
@@ -65,10 +76,20 @@ com um usuário privilegiado e nunca aponte a aplicação de runtime para ele.
 
 ## 2. Segredos (nunca em appsettings.json committado)
 
-`appsettings.json` tem placeholders (`User=root;Password=CHANGE_ME`) — a aplicação real usa
-`dotnet user-secrets` em desenvolvimento (ou variáveis de ambiente `Jwt__Key` /
-`ConnectionStrings__DefaultConnection` em produção). A partir de
-`backend/src/AppMorador.Api/`:
+`appsettings.json` (versionado no Git) contém só um placeholder inerte —
+`User=root;Password=CHANGE_ME` — nunca uma credencial real. As credenciais reais de cada máquina
+ficam em `dotnet user-secrets` em desenvolvimento (ou variáveis de ambiente `Jwt__Key` /
+`ConnectionStrings__DefaultConnection` em produção), que vivem fora da pasta do projeto
+(`%APPDATA%\Microsoft\UserSecrets\...` no Windows) e por isso nunca são versionadas.
+
+Exemplo da connection string real (com valores fictícios — nunca cole a senha real num
+documento ou commit):
+
+```
+Server=localhost;Port=3306;Database=appmorador;User=appmorador;Password=********;
+```
+
+A partir de `backend/src/AppMorador.Api/`:
 
 ```bash
 dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Server=localhost;Port=3306;Database=appmorador;User=appmorador;Password=<senha-forte-local>;"
@@ -157,7 +178,7 @@ mudar a porta/host do Backend, ajuste `PainelWeb/.env` (ou `.env.local`, que tem
 versionado) e também `Cors:AllowedOrigins` em `appsettings.Development.json` do Backend — sem isso
 o navegador bloqueia as requisições por CORS.
 
-**Login**: mesmas contas da tabela da seção 7, mas só contas internas (`Master`/`Técnico`/
+**Login**: mesmas contas da tabela da seção 8, mas só contas internas (`Master`/`Técnico`/
 `Suporte`) enxergam o menu completo — hoje só a conta `master@appmorador.local` tem uma dessas
 roles no seed. Uma conta cliente comum (Administrador/Supervisor/Operador/Morador) consegue logar
 no Painel Web (mesma autenticação do Mobile), mas cai numa Dashboard sem dados e sem explicação —
@@ -183,7 +204,36 @@ está rodando.
 própria máquina na rede local (`ipconfig`/`ifconfig`), nunca commitando o IP real de volta ao
 repositório.
 
-## 7. Dados de teste (seed de desenvolvimento)
+## 7. Testes automatizados
+
+```bash
+# Backend — a partir de backend/
+dotnet test
+
+# Painel Web — a partir de PainelWeb/
+npm run test
+
+# Mobile — a partir de mobile/
+npm run test
+```
+
+Os testes de backend rodam contra EF Core InMemory (`Microsoft.EntityFrameworkCore.InMemory`) —
+não tocam o MySQL real, então funcionam mesmo sem o banco configurado.
+
+## Observações importantes
+
+**Nunca rode o MySQL80 e o MySQL do XAMPP ao mesmo tempo.** Os dois tentam ocupar a porta 3306 —
+quem subir por último falha ao iniciar (ou, pior, o outro serviço para de responder enquanto o
+processo errado segura a porta). Se a máquina tem XAMPP instalado e você usa o `MySQL80` para
+este projeto, mantenha o módulo MySQL do XAMPP **parado** (XAMPP Control Panel → MySQL → Stop).
+Para checar rapidamente quem está com a porta:
+
+```powershell
+Get-NetTCPConnection -LocalPort 3306 | Select-Object OwningProcess
+Get-Process -Id <OwningProcess>
+```
+
+## 8. Dados de teste (seed de desenvolvimento)
 
 Em ambiente Development, a Api roda automaticamente um seed idempotente logo após subir e depois
 de aplicar as migrations (`AppMorador.Infrastructure.Persistence.Seed.DevelopmentSeeder`,
