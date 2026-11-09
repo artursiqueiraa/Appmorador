@@ -21,6 +21,11 @@ namespace AppMorador.Infrastructure.Notifications;
 /// </summary>
 public sealed class FirebaseNotificationProvider : INotificationProvider
 {
+    /// <summary>Sprint 24 — precisam bater com o canal e o arquivo de som registrados no app (webapp/app.json).</summary>
+    public const string CanalCritico = "alertas_criticos";
+
+    public const string SomCritico = "alerta_critico.wav";
+
     private static readonly object InicializacaoLock = new();
     private static FirebaseApp? _app;
 
@@ -62,14 +67,17 @@ public sealed class FirebaseNotificationProvider : INotificationProvider
                     ["equipamentoId"] = payload.EquipamentoId?.ToString() ?? string.Empty,
                     ["timestamp"] = DateTime.UtcNow.ToString("O"),
                     ["acao"] = payload.Acao,
+                    ["alertaId"] = payload.AlertaId?.ToString() ?? string.Empty,
                 },
                 Android = new AndroidConfig
                 {
-                    Priority = payload.Prioridade == PrioridadeNotificacao.Alta ? Priority.High : Priority.Normal,
+                    Priority = payload.Prioridade is PrioridadeNotificacao.Alta or PrioridadeNotificacao.Critica ? Priority.High : Priority.Normal,
                     Notification = new AndroidNotification
                     {
-                        ChannelId = ResolverCanalAndroid(payload.EventoTipo),
-                        Sound = "default",
+                        // Sprint 24 (ADR 0040) — crítico vai para o canal "alertas_criticos" (som de
+                        // alarme próprio, criado pelo app com importância máxima).
+                        ChannelId = payload.Prioridade == PrioridadeNotificacao.Critica ? CanalCritico : ResolverCanalAndroid(payload.EventoTipo),
+                        Sound = payload.Prioridade == PrioridadeNotificacao.Critica ? SomCritico : "default",
                     },
                 },
             };
@@ -95,7 +103,8 @@ public sealed class FirebaseNotificationProvider : INotificationProvider
 
     private static string ResolverCanalAndroid(EventoNotificacaoTipo tipo) => tipo switch
     {
-        EventoNotificacaoTipo.AlarmeDisparado or EventoNotificacaoTipo.EquipamentoOffline => "alertas",
+        EventoNotificacaoTipo.AlarmeDisparado or EventoNotificacaoTipo.EquipamentoOffline or EventoNotificacaoTipo.FalhaEnergia
+            or EventoNotificacaoTipo.BateriaBaixa => "alertas",
         EventoNotificacaoTipo.ComandoAcionado or EventoNotificacaoTipo.VisitanteAutorizado or EventoNotificacaoTipo.EntregaRecebida => "atividades",
         _ => "geral",
     };

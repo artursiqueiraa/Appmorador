@@ -1,3 +1,4 @@
+using AppMorador.Application.Rbac;
 using AppMorador.Application.Common;
 using AppMorador.Application.Notificacoes;
 using AppMorador.Domain.Entities;
@@ -14,6 +15,8 @@ namespace AppMorador.Application.Autorizacoes;
 /// </summary>
 public sealed class AutorizacaoServico : IAutorizacaoServico
 {
+    private readonly IAcessoPropriedadeServico _acesso;
+
     private readonly IVisitanteRepositorio _visitantes;
     private readonly IUnidadeRepositorio _unidades;
     private readonly IMoradorRepositorio _moradores;
@@ -27,8 +30,10 @@ public sealed class AutorizacaoServico : IAutorizacaoServico
         IMoradorRepositorio moradores,
         IAutorizacaoRepositorio autorizacoes,
         IHistoricoVisitanteRepositorio historico,
-        INotificationDispatcher notificationDispatcher)
+        INotificationDispatcher notificationDispatcher,
+        IAcessoPropriedadeServico acesso)
     {
+        _acesso = acesso;
         _visitantes = visitantes;
         _unidades = unidades;
         _moradores = moradores;
@@ -41,14 +46,14 @@ public sealed class AutorizacaoServico : IAutorizacaoServico
         Guid proprietarioId, Guid visitanteId, CriarAutorizacaoRequest request, CancellationToken cancellationToken)
     {
         var visitante = await _visitantes.GetByIdAsync(visitanteId, cancellationToken).ConfigureAwait(false);
-        if (visitante is null || visitante.Propriedade is null || visitante.Propriedade.ProprietarioId != proprietarioId)
+        if (visitante is null || visitante.Propriedade is null || !_acesso.Pode(proprietarioId, visitante.Propriedade, NivelAcesso.Alterar))
         {
             return Result<AutorizacaoResponse>.Fail("Visitante não encontrado.");
         }
 
         var unidade = await _unidades.GetByIdAsync(request.UnidadeId, cancellationToken).ConfigureAwait(false);
         if (unidade is null || unidade.Propriedade is null ||
-            unidade.Propriedade.Id != visitante.PropriedadeId || unidade.Propriedade.ProprietarioId != proprietarioId)
+            unidade.Propriedade.Id != visitante.PropriedadeId || !_acesso.Pode(proprietarioId, unidade.Propriedade, NivelAcesso.Alterar))
         {
             // Mesma mensagem generica de "nao encontrada" — nao revela se a unidade
             // existe em outra propriedade.
@@ -105,7 +110,7 @@ public sealed class AutorizacaoServico : IAutorizacaoServico
         Guid proprietarioId, Guid visitanteId, CancellationToken cancellationToken)
     {
         var visitante = await _visitantes.GetByIdAsync(visitanteId, cancellationToken).ConfigureAwait(false);
-        if (visitante is null || visitante.Propriedade is null || visitante.Propriedade.ProprietarioId != proprietarioId)
+        if (visitante is null || visitante.Propriedade is null || !_acesso.Pode(proprietarioId, visitante.Propriedade, NivelAcesso.Ver))
         {
             return Result<IReadOnlyList<AutorizacaoResponse>>.Fail("Visitante não encontrado.");
         }
@@ -220,9 +225,9 @@ public sealed class AutorizacaoServico : IAutorizacaoServico
             cancellationToken).ConfigureAwait(false);
     }
 
-    private static bool PertenceAoProprietario(Autorizacao? autorizacao, Guid proprietarioId) =>
+    private bool PertenceAoProprietario(Autorizacao? autorizacao, Guid proprietarioId, NivelAcesso nivel = NivelAcesso.Alterar) =>
         autorizacao?.MoradorResponsavel?.Unidade?.Propriedade is not null &&
-        autorizacao.MoradorResponsavel.Unidade.Propriedade.ProprietarioId == proprietarioId;
+        _acesso.Pode(proprietarioId, autorizacao.MoradorResponsavel.Unidade.Propriedade, nivel);
 
     private static AutorizacaoResponse ToDto(Autorizacao autorizacao, string moradorNome, string unidadeIdentificacao, string visitanteNome) => new()
     {

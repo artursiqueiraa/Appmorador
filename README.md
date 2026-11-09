@@ -73,10 +73,10 @@ dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Server=localhost;
 dotnet user-secrets set "Jwt:Key" "$(openssl rand -base64 64)"
 ```
 
-### 3. Mobile
+### 3. App (web + Android + iOS)
 
 ```bash
-cd mobile
+cd webapp
 cp .env.example .env   # ajuste EXPO_PUBLIC_API_URL se o Backend rodar em outro host/porta
 npm install
 ```
@@ -102,11 +102,13 @@ pendente.` (ou migrations sendo aplicadas, na primeira vez) → `Seed de desenvo
 `Now listening on: http://localhost:5027` → `Sistema pronto.` Swagger disponível em
 `http://localhost:5027/swagger` (só em Development).
 
-**Mobile** (a partir de `mobile/`):
+**App** (a partir de `webapp/` — base única web + Android + iOS, ADR 0039):
 
 ```bash
-npx expo start
+npx expo start          # celular (Expo) — ou: npm run web (navegador)
 ```
+
+O antigo `mobile/` foi arquivado na tag git `mobile-legado` (Sprint 23).
 
 ## Usuários de desenvolvimento / credenciais de teste
 
@@ -130,7 +132,7 @@ zonas e ocorrências de teste) — é a conta certa para explorar Dashboard e Ce
 ```
 appmorador/
 ├── backend/            # .NET 8 — Clean Architecture (Domain/Application/Infrastructure/Api)
-├── mobile/              # React Native/Expo
+├── webapp/              # App React Native/Expo — web, Android e iOS (base única)
 ├── docs/
 │   ├── adr/             # Decisões de arquitetura (ADRs)
 │   ├── roadmap/         # ROADMAP.md

@@ -28,6 +28,10 @@ TestResults/
 # verificação de portabilidade da Sprint 17.5 (clone limpo falhou o build).
 src/AppMorador.Api/snapshots/
 
+# Akteck Seg (ADR 0036) — fotos de rosto dos moradores (dado pessoal sensível),
+# gravadas em runtime em FotosMoradores:BasePath. Mesmo escopo específico acima.
+src/AppMorador.Api/fotos-moradores/
+
 # Bancos de teste locais (o projeto usa MySQL; regra preventiva caso algum
 # fluxo de teste use SQLite localmente)
 *.db

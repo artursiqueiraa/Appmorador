@@ -64,14 +64,14 @@ if (-not $ok) {
     exit 1
 }
 
-Write-Host "`n== 2. Preparando .env do Mobile ==" -ForegroundColor Cyan
-$mobileEnv = Join-Path $repoRoot "mobile\.env"
-$mobileEnvExample = Join-Path $repoRoot "mobile\.env.example"
+Write-Host "`n== 2. Preparando .env do App (webapp/) ==" -ForegroundColor Cyan
+$mobileEnv = Join-Path $repoRoot "webapp\.env"
+$mobileEnvExample = Join-Path $repoRoot "webapp\.env.example"
 if (-not (Test-Path $mobileEnv)) {
     Copy-Item $mobileEnvExample $mobileEnv
-    Write-Host "  Criado mobile\.env a partir de .env.example — ajuste EXPO_PUBLIC_API_URL para o IP da sua maquina se for testar num celular fisico." -ForegroundColor Yellow
+    Write-Host "  Criado webapp\.env a partir de .env.example — ajuste EXPO_PUBLIC_API_URL para o IP da sua maquina se for testar num celular fisico." -ForegroundColor Yellow
 } else {
-    Write-Host "  mobile\.env ja existe — mantido sem alteracao." -ForegroundColor Green
+    Write-Host "  webapp\.env ja existe — mantido sem alteracao." -ForegroundColor Green
 }
 
 Write-Host "`n== 3. Restaurando pacotes ==" -ForegroundColor Cyan
@@ -80,8 +80,8 @@ Push-Location (Join-Path $repoRoot "backend")
 dotnet restore
 Pop-Location
 
-Write-Host "  Mobile (npm install)..."
-Push-Location (Join-Path $repoRoot "mobile")
+Write-Host "  App (npm install)..."
+Push-Location (Join-Path $repoRoot "webapp")
 npm install
 Pop-Location
 

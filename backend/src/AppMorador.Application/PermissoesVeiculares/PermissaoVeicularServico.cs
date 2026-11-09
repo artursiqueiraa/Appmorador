@@ -1,3 +1,4 @@
+using AppMorador.Application.Rbac;
 using AppMorador.Application.Common;
 using AppMorador.Domain.Entities;
 using AppMorador.Domain.Repositories;
@@ -12,6 +13,8 @@ namespace AppMorador.Application.PermissoesVeiculares;
 /// </summary>
 public sealed class PermissaoVeicularServico : IPermissaoVeicularServico
 {
+    private readonly IAcessoPropriedadeServico _acesso;
+
     private readonly IVeiculoRepositorio _veiculos;
     private readonly IPontoAcessoRepositorio _pontosAcesso;
     private readonly IPermissaoVeicularRepositorio _permissoes;
@@ -21,8 +24,10 @@ public sealed class PermissaoVeicularServico : IPermissaoVeicularServico
         IVeiculoRepositorio veiculos,
         IPontoAcessoRepositorio pontosAcesso,
         IPermissaoVeicularRepositorio permissoes,
-        IHistoricoVeiculoRepositorio historico)
+        IHistoricoVeiculoRepositorio historico,
+        IAcessoPropriedadeServico acesso)
     {
+        _acesso = acesso;
         _veiculos = veiculos;
         _pontosAcesso = pontosAcesso;
         _permissoes = permissoes;
@@ -33,7 +38,7 @@ public sealed class PermissaoVeicularServico : IPermissaoVeicularServico
         Guid proprietarioId, Guid veiculoId, CriarPermissaoVeicularRequest request, CancellationToken cancellationToken)
     {
         var veiculo = await _veiculos.GetByIdAsync(veiculoId, cancellationToken).ConfigureAwait(false);
-        if (veiculo?.Morador?.Unidade?.Propriedade is null || veiculo.Morador.Unidade.Propriedade.ProprietarioId != proprietarioId)
+        if (veiculo?.Morador?.Unidade?.Propriedade is null || !_acesso.Pode(proprietarioId, veiculo.Morador.Unidade.Propriedade, NivelAcesso.Alterar))
         {
             return Result<PermissaoVeicularResponse>.Fail("Veículo não encontrado.");
         }
@@ -67,7 +72,7 @@ public sealed class PermissaoVeicularServico : IPermissaoVeicularServico
         Guid proprietarioId, Guid veiculoId, CancellationToken cancellationToken)
     {
         var veiculo = await _veiculos.GetByIdAsync(veiculoId, cancellationToken).ConfigureAwait(false);
-        if (veiculo?.Morador?.Unidade?.Propriedade is null || veiculo.Morador.Unidade.Propriedade.ProprietarioId != proprietarioId)
+        if (veiculo?.Morador?.Unidade?.Propriedade is null || !_acesso.Pode(proprietarioId, veiculo.Morador.Unidade.Propriedade, NivelAcesso.Ver))
         {
             return Result<IReadOnlyList<PermissaoVeicularResponse>>.Fail("Veículo não encontrado.");
         }
@@ -80,7 +85,7 @@ public sealed class PermissaoVeicularServico : IPermissaoVeicularServico
     public async Task<Result> DeleteAsync(Guid proprietarioId, Guid permissaoId, CancellationToken cancellationToken)
     {
         var permissao = await _permissoes.GetByIdAsync(permissaoId, cancellationToken).ConfigureAwait(false);
-        if (permissao?.Veiculo?.Morador?.Unidade?.Propriedade is null || permissao.Veiculo.Morador.Unidade.Propriedade.ProprietarioId != proprietarioId)
+        if (permissao?.Veiculo?.Morador?.Unidade?.Propriedade is null || !_acesso.Pode(proprietarioId, permissao.Veiculo.Morador.Unidade.Propriedade, NivelAcesso.Alterar))
         {
             return Result.Fail("Permissão não encontrada.");
         }

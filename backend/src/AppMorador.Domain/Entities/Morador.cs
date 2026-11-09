@@ -30,6 +30,12 @@ public class Morador : EntidadeComSoftDelete
 
     public required StatusMorador Status { get; set; }
 
+    /// <summary>Akteck Seg (ADR 0036) — titular ou dependente. Registros anteriores viram Titular (backfill da migration).</summary>
+    public TipoMorador Tipo { get; set; } = TipoMorador.Titular;
+
+    /// <summary>Akteck Seg (ADR 0036) — preenchido só para dependentes; sempre nulo em titulares.</summary>
+    public Parentesco? Parentesco { get; set; }
+
     public string? Observacoes { get; set; }
 
     public required DateTime CreatedAtUtc { get; set; }

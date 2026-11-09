@@ -1,3 +1,4 @@
+using AppMorador.Application.Rbac;
 using AppMorador.Application.Common;
 using AppMorador.Domain.Entities;
 using AppMorador.Domain.Repositories;
@@ -6,6 +7,8 @@ namespace AppMorador.Application.Propriedades;
 
 public sealed class PropriedadeServico : IPropriedadeServico
 {
+    private readonly IAcessoPropriedadeServico _acesso;
+
     private readonly IPropriedadeRepositorio _propriedades;
     private readonly IUnidadeRepositorio _unidades;
     private readonly IMoradorRepositorio _moradores;
@@ -56,8 +59,10 @@ public sealed class PropriedadeServico : IPropriedadeServico
         IEquipamentoRepositorio equipamentos,
         IUsuarioPropriedadeRepositorio usuariosPropriedade,
         IUsuarioPropriedadePermissaoRepositorio usuariosPropriedadePermissao,
-        IPropriedadeFeatureFlagRepositorio features)
+        IPropriedadeFeatureFlagRepositorio features,
+        IAcessoPropriedadeServico acesso)
     {
+        _acesso = acesso;
         _propriedades = propriedades;
         _unidades = unidades;
         _moradores = moradores;
@@ -123,11 +128,27 @@ public sealed class PropriedadeServico : IPropriedadeServico
 
     public async Task<IReadOnlyList<PropriedadeResponse>> ListByOwnerAsync(Guid proprietarioId, CancellationToken cancellationToken)
     {
-        var propriedades = await _propriedades.ListByOwnerAsync(proprietarioId, cancellationToken).ConfigureAwait(false);
+        var propriedades = (await _propriedades.ListByOwnerAsync(proprietarioId, cancellationToken).ConfigureAwait(false)).ToList();
+
+        // Sprint 25 (ADR 0041) — também as propriedades em que o usuário é membro ativo.
+        foreach (var propriedadeId in _acesso.PropriedadesComoMembro)
+        {
+            if (propriedades.Any(p => p.Id == propriedadeId))
+            {
+                continue;
+            }
+
+            var compartilhada = await _propriedades.GetByIdAsync(propriedadeId, cancellationToken).ConfigureAwait(false);
+            if (compartilhada is not null)
+            {
+                propriedades.Add(compartilhada);
+            }
+        }
+
         var resultado = new List<PropriedadeResponse>(propriedades.Count);
         foreach (var propriedade in propriedades)
         {
-            resultado.Add(await ToDtoEnriquecidoAsync(propriedade, cancellationToken).ConfigureAwait(false));
+            resultado.Add(await ToDtoEnriquecidoAsync(propriedade, proprietarioId, cancellationToken).ConfigureAwait(false));
         }
 
         return resultado;
@@ -141,9 +162,10 @@ public sealed class PropriedadeServico : IPropriedadeServico
     /// algum motivo não existir, devolve Permissoes vazias (nunca uma exceção) — mais
     /// seguro exibir "sem permissão" do que travar a lista de propriedades inteira.
     /// </summary>
-    private async Task<PropriedadeResponse> ToDtoEnriquecidoAsync(Propriedade propriedade, CancellationToken cancellationToken)
+    private async Task<PropriedadeResponse> ToDtoEnriquecidoAsync(Propriedade propriedade, Guid usuarioId, CancellationToken cancellationToken)
     {
-        var vinculo = await _usuariosPropriedade.GetAsync(propriedade.ProprietarioId, propriedade.Id, cancellationToken).ConfigureAwait(false);
+        // Sprint 25 — vínculo de QUEM está pedindo (dono ou membro), com o papel e as permissões dele.
+        var vinculo = await _usuariosPropriedade.GetAsync(usuarioId, propriedade.Id, cancellationToken).ConfigureAwait(false);
         var permissoes = vinculo is not null
             ? await _usuariosPropriedadePermissao.ListAsync(vinculo.Id, cancellationToken).ConfigureAwait(false)
             : [];
@@ -155,7 +177,7 @@ public sealed class PropriedadeServico : IPropriedadeServico
             Nome = propriedade.Nome,
             Tipo = propriedade.Tipo,
             Endereco = propriedade.Endereco,
-            Perfil = vinculo?.Perfil ?? PerfilPropriedade.Administrador,
+            Perfil = vinculo?.Perfil ?? _acesso.PapelEm(usuarioId, propriedade) ?? PerfilPropriedade.Administrador,
             Permissoes = permissoes,
             Features = features,
         };
@@ -168,7 +190,7 @@ public sealed class PropriedadeServico : IPropriedadeServico
 
         // Mesma mensagem para "nao existe" e "existe mas nao e do usuario" — nao
         // revela para o cliente que uma propriedade de outro dono existe com este Id.
-        if (propriedade is null || propriedade.ProprietarioId != proprietarioId)
+        if (propriedade is null || !_acesso.Pode(proprietarioId, propriedade, NivelAcesso.Alterar))
         {
             return Result<PropriedadeResponse>.Fail("Propriedade não encontrada.");
         }
@@ -184,7 +206,7 @@ public sealed class PropriedadeServico : IPropriedadeServico
     public async Task<Result> DeleteAsync(Guid proprietarioId, Guid propriedadeId, CancellationToken cancellationToken)
     {
         var propriedade = await _propriedades.GetByIdAsync(propriedadeId, cancellationToken).ConfigureAwait(false);
-        if (propriedade is null || propriedade.ProprietarioId != proprietarioId)
+        if (propriedade is null || !_acesso.Pode(proprietarioId, propriedade, NivelAcesso.Proprietario))
         {
             return Result.Fail("Propriedade não encontrada.");
         }

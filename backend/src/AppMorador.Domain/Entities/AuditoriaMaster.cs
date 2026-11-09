@@ -11,6 +11,9 @@ public enum TipoAcaoAuditoria
     Excluir = 7,
     Visualizar = 8,
     FalhaAutorizacao = 9,
+
+    /// <summary>Sprint 24 (ADR 0040) — simulação de evento pelo painel (homologação de alertas).</summary>
+    SimularEvento = 10,
 }
 
 /// <summary>

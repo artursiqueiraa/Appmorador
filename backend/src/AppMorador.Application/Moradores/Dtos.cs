@@ -19,6 +19,14 @@ public sealed class CriarMoradorRequest
     [MaxLength(30)]
     public string? Documento { get; set; }
 
+    /// <summary>Akteck Seg (ADR 0036) — titular ou dependente. Padrão: Titular.</summary>
+    [EnumDataType(typeof(TipoMorador), ErrorMessage = "Tipo inválido.")]
+    public TipoMorador Tipo { get; set; } = TipoMorador.Titular;
+
+    /// <summary>Só para dependentes; ignorado (gravado nulo) para titulares.</summary>
+    [EnumDataType(typeof(Parentesco), ErrorMessage = "Parentesco inválido.")]
+    public Parentesco? Parentesco { get; set; }
+
     [MaxLength(1000)]
     public string? Observacoes { get; set; }
 }
@@ -42,6 +50,14 @@ public sealed class AtualizarMoradorRequest
     [Required(ErrorMessage = "Status é obrigatório.")]
     public required StatusMorador Status { get; set; }
 
+    /// <summary>Akteck Seg (ADR 0036) — titular ou dependente. Padrão: Titular.</summary>
+    [EnumDataType(typeof(TipoMorador), ErrorMessage = "Tipo inválido.")]
+    public TipoMorador Tipo { get; set; } = TipoMorador.Titular;
+
+    /// <summary>Só para dependentes; ignorado (gravado nulo) para titulares.</summary>
+    [EnumDataType(typeof(Parentesco), ErrorMessage = "Parentesco inválido.")]
+    public Parentesco? Parentesco { get; set; }
+
     [MaxLength(1000)]
     public string? Observacoes { get; set; }
 }
@@ -63,6 +79,13 @@ public sealed class MoradorResponse
     public string? Documento { get; init; }
 
     public required StatusMorador Status { get; init; }
+
+    public required TipoMorador Tipo { get; init; }
+
+    public Parentesco? Parentesco { get; init; }
+
+    /// <summary>Akteck Seg (ADR 0036) — há foto de rosto salva no servidor (servida em <c>GET api/moradores/{id}/foto</c>).</summary>
+    public bool TemFoto { get; init; }
 
     public string? Observacoes { get; init; }
 }

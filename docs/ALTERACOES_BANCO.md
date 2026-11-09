@@ -3,6 +3,58 @@
 Registro de toda migration aplicada ao banco `appmorador`, com o resumo técnico apresentado
 antes da aplicação (protocolo permanente de revisão).
 
+
+## 20261109013816_Sprint27SegurancaConta — 2026-11-08
+
+**Operações**: 3 `AddColumn` em `Usuarios` (`PinConfirmacaoHash`, `TentativasPinFalhas` padrão 0,
+`PinBloqueadoAteUtc`) + 2 `CreateTable` (`ComandosExecutados`, com índice (Propriedade, Data) e índice
+único (Usuário, ChaveIdempotencia); `RegistrosBackup`) + `INSERT` copiando as 7 linhas de
+`AberturasPontoAcesso` para `ComandosExecutados` (mesmo Id, tipo `AbrirAcesso`).
+
+**Impacto nos dados**: nenhum dado existente alterado; contas ficam sem PIN (nada muda até criarem).
+**Destrutivas**: nenhuma (`AberturasPontoAcesso` mantida, só deixa de receber registros).
+**Status**: resumo aprovado e aplicada em 2026-11-08 (backend reiniciado).
+
+## 20261108212424_Sprint26FacialLgpd — 2026-11-08
+
+**Operações**: 2 `CreateTable` (`ConsentimentosBiometricos`, `SincronizacoesFoto` com índice único
+(Morador, Equipamento)). **Impacto nos dados**: nenhum. **Destrutivas**: nenhuma. Resumo aprovado e
+aplicada em 2026-11-08 (registro incluído na Sprint 27; faltava neste arquivo).
+
+## 20261108204449_Sprint25Multiusuario — 2026-11-08
+
+**Operações**: 1 `CreateTable` (`ConvitesPropriedade`, índice único em `CodigoHash`) + 2 `AddColumn`
+opcionais em `Usuarios` (`Telefone`, `ExcluidoEmUtc`).
+
+**Impacto nos dados**: nenhum. **Destrutivas**: nenhuma. Resumo aprovado e aplicada em 2026-11-08.
+
+## Sprint24_5PortoesEPortas — 2026-11-08
+
+**Operações**: 3 `AddColumn` em `PontosAcesso` (`EquipamentoAcionadorId`, `NumeroSaida`, `CameraId`,
+todas opcionais) + 1 `CreateTable` (`AberturasPontoAcesso`) + 3 índices + 3 FKs (equipamento
+`Restrict`, câmera `SetNull`, ponto de acesso `Restrict`).
+
+**Impacto nos dados**: nenhum. Os pontos de acesso existentes ficam com os campos novos vazios
+("Não abre pelo app") até alguém editar.
+
+**Operações destrutivas**: nenhuma.
+
+**Status**: resumo aprovado e aplicada em 2026-11-08.
+
+## 20261108162232_Sprint24AlertasConfiaveis — 2026-11-08
+
+**Operações**: 4 `CreateTable` (`AlertasCriticos`, `ContatosEmergencia`, `EventosConectividade`,
+`ControlesEnvioNotificacao`) + 1 `AddColumn` (`Propriedades.MinutosEscalonamento`, `int NOT NULL`,
+padrão 2) + 6 índices. FKs `Restrict` para `Propriedades`, `Usuarios` e `Equipamentos`.
+
+**Impacto nos dados**: nenhum dado existente é alterado. Toda propriedade já cadastrada recebe
+`MinutosEscalonamento = 2` pelo default da coluna. As tabelas novas nascem vazias.
+
+**Operações destrutivas**: nenhuma. `Down()` remove as 4 tabelas e a coluna (perde só o que foi
+criado depois).
+
+**Status**: resumo aprovado e aplicada em 2026-11-08.
+
 ## 20260726212346_RbacMaster — 2026-07-26
 
 **Operações**: 3 `AddColumn` (`Usuarios.Ativo`, `Usuarios.RoleGlobal`, `Equipamentos.ModeloEquipamentoId`)
@@ -308,3 +360,13 @@ necessidade de default fake); `DeleteBehavior` de `Property`→`User` alterado d
 Schema inicial do pipeline de alarme JFL: `AlarmPanels`, `Zones`, `Occurrences`,
 `AlarmEventLogs`, `Dvrs`, `Cameras`, `ZoneCameraLinks`. Este era o schema em inglês, pré-ADR 0003 —
 o arquivo `InitialCreate` atual (mesmo ID de migration) já nasce com o schema final em português.
+
+## 2026-11-02 — `MoradorTipoEParentesco` (ADR 0036)
+
+| Item | Detalhe |
+|---|---|
+| Operações | `AddColumn` `Moradores.Tipo` varchar(20) NOT NULL DEFAULT 'Titular'; `AddColumn` `Moradores.Parentesco` varchar(20) NULL |
+| Impacto nos dados | Moradores existentes viram `Titular` pelo default; nada alterado ou removido |
+| Destrutivo | Não (o `Down` só remove as duas colunas novas) |
+| Segurança | Sem dado sensível nas colunas (a foto facial fica em disco, não no banco) |
+| Aplicada | Automaticamente no startup (ADR 0008), resumo apresentado antes |

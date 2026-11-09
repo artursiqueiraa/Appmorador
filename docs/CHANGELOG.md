@@ -2,6 +2,250 @@
 
 Registro cronológico das mudanças relevantes do projeto. Cada Sprint/Fase adiciona uma entrada.
 
+## [Sprint 27: Segurança da conta e confiabilidade] — 2026-11-08
+
+Objetivo: comandos sensíveis protegidos e plataforma confiável (ADR 0043).
+
+### Adicionado
+- PIN de confirmação para desarmar, acionar saída e abrir acesso (validado no servidor; 5 erros
+  bloqueiam 15 min; "esqueci o PIN" com a senha da conta).
+- Confirmação por digital/rosto do celular e "Bloquear o app" (Ajustes → Segurança e PIN).
+- Auditoria única de comandos (`ComandosExecutados`) com autor e forma de confirmação; lista dos
+  últimos comandos para dono e gerente.
+- Idempotência dos comandos (`Idempotency-Key`): toque duplo não envia duas vezes.
+- Saúde do sistema: `/health`, vigia com e-mail ao Master e card no painel admin.
+- Backup diário às 3h (Agendador do Windows) com retenção 7+4 e teste de restauração automático.
+
+### Alterado
+- App web: refresh token em cookie HttpOnly e access token só em memória (dívidas 37 e 51 resolvidas).
+- Logout não exige mais o access token.
+
+## [Sprint 26: Facial ponta a ponta + LGPD] — 2026-11-08
+
+Objetivo: o rosto cadastrado libera a porta, dentro da lei (ADR 0042).
+
+### Adicionado
+- Consentimento biométrico antes da câmera (dependente: responsável legal); revogar apaga o rosto.
+- Rosto enviado e apagado nos leitores Control iD e Hikvision (provider ISAPI novo), com situação
+  por leitor no app e nova tentativa automática.
+- Hikvision abre porta em "Portões e portas".
+- Termos de Uso e Política de Privacidade no app (dados da empresa a preencher).
+- Simulador Hikvision (`backend/tools/HikvisionSimulator`, porta 9600).
+
+### Alterado
+- Retenção: foto apagada na hora; histórico de pessoas removidas anonimizado após 6 meses.
+- Dívidas 55 e 57 resolvidas.
+
+## [Sprint 25: Contas e multiusuário] — 2026-11-08
+
+Objetivo: o dono divide o acesso com quem precisa, com papel, e tira na hora (ADR 0041).
+
+### Adicionado
+- Papéis: Proprietário, Gerente, Membro e Visualizador.
+- Convite por e-mail (Resend; simulado sem chave) e link para WhatsApp/SMS — uso único, 48 h.
+- Telas "Pessoas com acesso" (dono), "Minha conta" (dados, senha, excluir conta) e cartão de convite.
+- Endpoints de pessoas, convites e minha conta.
+
+### Alterado
+- 56 checagens de "é o dono?" trocadas pelo serviço único de acesso; tempo real e lista de
+  propriedades aceitam membros.
+- Menu: Vagas e Entregas só em condomínio; "Pessoas com acesso" só para o dono; Visualizador sem
+  armar/desarmar e sem pânico.
+- Dívidas 47 (gestão de conta) e 58 (telas sem uso) resolvidas; 34 em resolução.
+
+## [Sprint 24.5: Portões e portas] — 2026-11-08
+
+Objetivo: tudo que abre num lugar só, vendo a porta antes de abrir ([SPRINT_024_5.md](sprints/SPRINT_024_5.md)).
+
+### Adicionado
+- Ponto de acesso ligado ao que o abre (central JFL — saída PGM — ou leitor Control iD — porta) e à
+  câmera que mostra a porta.
+- Tela do acesso: imagem da câmera (com "Atualizar"), **Abrir** e **Agora não**. Cada abertura fica
+  registrada (`AberturasPontoAcesso`).
+- Comando de abrir porta no Control iD (`execute_actions`, ação "door"), validado no simulador local;
+  pendente de homologação física.
+- Endpoints `GET /api/properties/{id}/pontos-acesso/acionadores` e `POST /api/pontos-acesso/{id}/abrir`.
+
+### Alterado
+- "Portões e portas" mostra para cada acesso o que o abre; tocar leva à tela do acesso.
+- Início: o bloco "Portões" lista os acessos que abrem pelo app (mesma fonte), em vez das PGMs com
+  nome salvo só no celular.
+
+## [Sprint 24: Alertas confiáveis] — 2026-11-08
+
+Objetivo: nenhum evento crítico passa despercebido (ADR 0040).
+
+### Adicionado
+- Alerta crítico com "Estou ciente": disparo, pânico, violação e central sem comunicação. Push no
+  canal Android "Alertas críticos" (som de alarme próprio, prioridade máxima) e tela cheia no app.
+- Escalonamento: sem confirmação em 2 min (ajustável de 1 a 30), avisa membros e depois os
+  contatos de emergência por SMS (simulado até haver provedor).
+- Contatos de emergência (até 5, com ordem) e tela "Alertas e emergência" no menu.
+- Botão de pânico no Início (segurar 3 s).
+- Vigia de conectividade: central sem keep-alive há 3× o intervalo vira "Central sem comunicação";
+  o retorno fica no histórico.
+- Catálogo Contact ID com pânico, coação, violação, falta/retorno de energia e bateria baixa (SIA
+  DC-05, pendente de homologação na central JFL).
+- Testes: 54 novos no backend (197 no total; os 4 do debounce em memória foram substituídos) e 18
+  no app (88 no total).
+
+- Simulador de eventos no painel admin (Master): dispara disparo, pânico, violação, central sem
+  comunicação, falta de energia ou bateria fraca numa propriedade, marcado "Teste:" e auditado.
+
+### Corrigido
+- Android: conteúdo do fim das telas fora das abas ficava atrás da barra de navegação; formulários
+  embaixo de lista (12 telas) agora rolam e acompanham o teclado (`FormularioRolavel`).
+
+### Alterado
+- Debounce de notificações persistido no banco (dívida 41 resolvida).
+- Central de Eventos: quedas/retornos de comunicação e acompanhamento dos alertas (dívida 24
+  resolvida); gravidade dos eventos da central vem da categoria do código.
+- `webapp/tsconfig.json` exclui `dist/` (a saída do `expo export` estourava a pilha do `tsc`).
+
+### Removido
+- `AlertaDisparo` e o botão "Simular disparo (demo)" do Início, substituídos pelo alerta real.
+
+## [Sprint 23: Base única web + Android + iOS] — 2026-11-08
+
+Objetivo: um só código de app para navegador e celular (ADR 0039), base para o
+[Plano de Ação de Produto](roadmap/PLANO_ACAO_PRODUTO.md).
+
+### Adicionado
+- `webapp/` gera o APK Android: `app.json` com blocos `android`/`ios`, plugins nativos, textos de
+  permissão em pt-BR e `eas.json`. Identificador `com.akteck.seg`.
+- Ícone, ícone adaptativo (frente, fundo e monocromático) e splash com o símbolo Akteck.
+- Arquivos por plataforma: `api/useImagemAutenticada` (`data:` no celular, `blob:` no navegador)
+  e `moradores/arquivoFoto` (`{ uri, name, type }` no celular, `Blob` no navegador). 3 testes novos
+  (70 no total).
+- Plano de Ação de Produto (Sprints 23–32) e planejamento da Sprint 23.
+
+### Alterado
+- Dependências alinhadas ao Expo SDK 57 (patches), o que corrige a regressão de memória do Hermes.
+  `expo-doctor`: 21/21.
+
+### Corrigido
+- Android: botões verdes não preenchiam a largura (degradê agora medido pelo `onLayout`) e o título
+  das telas ficava sob a barra de status (recuo da área segura aplicado em `ColunaConteudo`).
+
+### Removido
+- `react-native-edge-to-edge`: sem manutenção e redundante no React Native 0.86.
+- `mobile/`: arquivado na tag git `mobile-legado` após a aprovação do APK em dispositivo
+  (homologação em `docs/testing/Sprint23.md`). Scripts `setup_project.ps1`/`start_mobile.ps1` e o
+  README passaram a apontar para `webapp/`. Dívidas 52 e 59 resolvidas.
+
+### Pendente
+- Homologação do APK em dispositivo, depois arquivamento do `mobile/` (tag `mobile-legado`).
+
+## [Web App: volta ao protótipo original] — 2026-11-03
+
+### Alterado
+- Visual do Web App volta ao protótipo UX001 (grafite + status), substituindo o verde neon (ADR 0038).
+- Navegação: abas Início, Câmeras, Alarme e Moradores, mais o botão Menu, que abre o menu lateral
+  (no computador, barra lateral fixa).
+- Início: cartão de status com anel pulsando e botões **Armar total / Noturno / Desarmar com
+  comando real** na central; abrir portão; câmeras; atividade recente.
+- Aba Moradores: cartão "Cadastrar rosto", abas Moradores e Provisórios. Portões, vagas e entregas
+  foram para o menu.
+
+## [Web App: identidade oficial e aba Pessoas] — 2026-11-03
+
+Objetivo: Web App fiel à referência visual oficial da Akteck Seg, cadastro de moradores, dependentes,
+rosto e veículos num lugar só, e layout de computador de verdade (ADR 0036 e 0037). App mobile intocado.
+
+### Adicionado
+- Backend: `Morador.Tipo`/`Parentesco` (migration aditiva) e foto facial no servidor
+  (`PUT/GET/DELETE api/moradores/{id}/foto`). 13 testes novos (147 no total).
+- Web App:
+  - identidade verde neon (paleta, brilho, degradê, logo novo) e componentes compartilhados em
+    `components/neon/`;
+  - telas Login, Criar conta, Início, Pessoas, Cadastro de pessoa e Cadastro facial no padrão
+    da referência;
+  - tela **Alarme** com status e armar/desarmar reais da central JFL;
+  - restyle de Portas e Acessos, Câmeras (busca, filtros, grade), Eventos e Informações da Unidade;
+  - navegação Início / Pessoas / Acessos / Câmeras / Mais;
+  - computador: Início em duas colunas e Pessoas em lista + detalhe.
+
+### Corrigido
+- Botões "Armar total/Noturno/Desarmar" do Início eram só visuais. Foram substituídos pelo atalho
+  para a tela Alarme, com comando real.
+- Segurança: `api/usuarios-internos` passa a recusar senha fraca ou vazia (DIVIDA 54 resolvida).
+- Painel: selos de status mais leves, nome comercial do fabricante e trilha de navegação sem repetição.
+
+### Dívida técnica registrada
+- Itens 57 (rosto não vai ao leitor físico), 58 (itens da referência sem suporte real) e 59 (visual
+  diferente entre web e mobile).
+
+## [Akteck Seg — Painel v2 e nova identidade] — 2026-11-02
+
+Objetivo: nova marca Akteck Seg, redesign do Painel e do Web App, dashboard com funcionalidades
+novas e cadastro de nova instalação pelo Painel (ADR 0035). App mobile intocado.
+
+### Adicionado
+- Identidade Akteck Seg: símbolo SVG, favicon, fonte Geist e paleta com azul de marca separado do
+  verde de status (Painel e Web App).
+- Painel: navegação agrupada em 5 áreas, cabeçalho com trilha "Grupo / Página", menu em gaveta
+  abaixo de 960px.
+- Dashboard: fila "Clientes que precisam de atenção", indicadores clicáveis, distribuições em barras
+  com cor semântica e atividade recente em linguagem humana.
+- Telas novas: Equipe interna, Catálogo de modelos, Recursos contratados (no detalhe do cliente) e
+  Nova instalação (assistente em 4 etapas).
+- Backend: `POST api/painel/novas-instalacoes` (Master), que orquestra cadastro, propriedade e
+  provisionamento já existentes. Sem migration. 5 testes unitários.
+- Testes do Painel: agrupamento da fila de atenção e descrição das atividades (62 testes no total).
+
+### Corrigido
+- Equipamentos Offline apareciam em verde e Online em laranja no gráfico de status.
+- Conteúdo do Painel deslocado 480px para a direita (margem dobrada no layout).
+- Itens de Suporte acendiam juntos no menu.
+- Gráficos com cores do tema escuro no modo claro.
+- Estreitar a janela abaixo de 600px apagava formulários em andamento (o Painel era desmontado).
+- Web App: borda dos campos com contraste 1.47:1 passou para ≥ 3:1; texto "mute" passou de 3.3:1
+  para 5.7:1.
+
+### Dívida técnica registrada
+- Itens 54 (senha de usuário interno sem validação no servidor), 55 (link de termos no domínio
+  antigo) e 56 (amostras de 100 itens).
+
+## [Web App do Morador] — 2026-11-02
+
+Objetivo: levar o app mobile do morador para o navegador, com o mesmo visual e responsivo, sem
+alterar `mobile/` (ADR 0034).
+
+### Adicionado
+- `webapp/`: cópia do Mobile rodando via Expo Web (react-native-web). Mesmas telas, componentes e
+  tokens. `npm run web` (dev, porta 8081) e `npm run build` (site estático em `dist/`).
+- Layout responsivo: navegação inferior abaixo de 1024px; barra lateral com as mesmas 4 abas e
+  conteúdo em coluna centralizada a partir de 1024px (tokens em `theme/layout.ts`).
+- `DialogoAlerta`: substituto do `Alert.alert`, que é vazio no react-native-web. As 24
+  confirmações (sair, excluir, revogar, comandos) passam a funcionar no navegador.
+- Anel de foco por teclado (`:focus-visible`), corrigindo um achado do audit Hallmark.
+- Testes: `DialogoAlerta.test.tsx` e `pushService.web.test.ts` (63 testes no total).
+
+### Corrigido (só no web app)
+- App inteiro caía no ErrorBoundary ao abrir: `expo-notifications` lança `UnavailabilityError` na
+  web. Push agora fica explicitamente indisponível no navegador, com texto honesto na tela de
+  Notificações.
+- Tempo real (SignalR) bloqueado por CORS: o cliente de navegador enviava cookies. Agora usa
+  `withCredentials: false`, já que a autenticação é só pelo JWT.
+
+### Melhorado — primeiro cadastro (só no web app)
+- Primeira tela sem propriedade: cartão de boas-vindas (`PrimeiraPropriedadeCard`) com
+  "Começar configuração guiada" como caminho principal e "Preencher tudo de uma vez" como
+  secundário. Antes, o formulário e o botão guiado apareciam juntos no rodapé, abaixo de uma
+  área vazia.
+- Assistente (`WizardStepLayout`): "Etapa X de 7" + barra de progresso, botão Voltar (exceto
+  logo após criar a propriedade, para não criar uma duplicada), campos na largura toda (antes
+  encolhiam a cerca de 180px), ações logo abaixo do conteúdo e cartão centralizado no desktop.
+- Tipo de propriedade em cartões com descrição (`TipoPropriedadeSelector variante="cartoes"`).
+  O visual em etiquetas continua nas demais telas.
+
+### Não alterado
+- `mobile/` e backend: nenhum arquivo.
+
+### Dívida técnica registrada
+- Itens 51 (tokens em `localStorage`), 52 (duplicação `mobile/src` ↔ `webapp/src`) e 53 (contraste
+  da borda dos campos) em `DIVIDA_TECNICA.md`.
+
 ## [Sprint 22C.2 — Cadastro de Equipamentos por Fabricante] — 2026-07-30
 
 Objetivo: substituir o formulário genérico de cadastro de Equipamentos (Sprint 22B) por um

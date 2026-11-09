@@ -1,3 +1,4 @@
+using AppMorador.Application.Rbac;
 using AppMorador.Application.Common;
 using AppMorador.Domain.Repositories;
 
@@ -10,11 +11,15 @@ namespace AppMorador.Application.Eventos;
 /// </summary>
 public sealed class EventosServico : IEventosServico
 {
+    private readonly IAcessoPropriedadeServico _acesso;
+
     private readonly IPropriedadeRepositorio _propriedades;
     private readonly IEnumerable<IFonteEventos> _fontes;
 
-    public EventosServico(IPropriedadeRepositorio propriedades, IEnumerable<IFonteEventos> fontes)
+    public EventosServico(IPropriedadeRepositorio propriedades, IEnumerable<IFonteEventos> fontes,
+        IAcessoPropriedadeServico acesso)
     {
+        _acesso = acesso;
         _propriedades = propriedades;
         _fontes = fontes;
     }
@@ -23,7 +28,7 @@ public sealed class EventosServico : IEventosServico
         Guid proprietarioId, Guid propriedadeId, FiltroEventos filtro, int pagina, int tamanhoPagina, CancellationToken cancellationToken)
     {
         var propriedade = await _propriedades.GetByIdAsync(propriedadeId, cancellationToken).ConfigureAwait(false);
-        if (propriedade is null || propriedade.ProprietarioId != proprietarioId)
+        if (propriedade is null || !_acesso.Pode(proprietarioId, propriedade, NivelAcesso.Ver))
         {
             return Result<EventosPaginadosResponse>.Fail("Propriedade não encontrada.");
         }

@@ -1,3 +1,4 @@
+using AppMorador.Application.Rbac;
 using AppMorador.Application.Common;
 using AppMorador.Domain.Entities;
 using AppMorador.Domain.Repositories;
@@ -12,6 +13,8 @@ namespace AppMorador.Application.PermissoesAcesso;
 /// </summary>
 public sealed class PermissaoAcessoServico : IPermissaoAcessoServico
 {
+    private readonly IAcessoPropriedadeServico _acesso;
+
     private readonly ICredencialRepositorio _credenciais;
     private readonly IPontoAcessoRepositorio _pontosAcesso;
     private readonly IPermissaoAcessoRepositorio _permissoes;
@@ -21,8 +24,10 @@ public sealed class PermissaoAcessoServico : IPermissaoAcessoServico
         ICredencialRepositorio credenciais,
         IPontoAcessoRepositorio pontosAcesso,
         IPermissaoAcessoRepositorio permissoes,
-        IHistoricoCredencialRepositorio historico)
+        IHistoricoCredencialRepositorio historico,
+        IAcessoPropriedadeServico acesso)
     {
+        _acesso = acesso;
         _credenciais = credenciais;
         _pontosAcesso = pontosAcesso;
         _permissoes = permissoes;
@@ -34,7 +39,7 @@ public sealed class PermissaoAcessoServico : IPermissaoAcessoServico
     {
         var credencial = await _credenciais.GetByIdAsync(credencialId, cancellationToken).ConfigureAwait(false);
         var propriedadeDaCredencial = credencial?.Morador?.Unidade?.Propriedade;
-        if (propriedadeDaCredencial is null || propriedadeDaCredencial.ProprietarioId != proprietarioId)
+        if (propriedadeDaCredencial is null || !_acesso.Pode(proprietarioId, propriedadeDaCredencial, NivelAcesso.Alterar))
         {
             return Result<PermissaoAcessoResponse>.Fail("Credencial não encontrada.");
         }
@@ -73,7 +78,7 @@ public sealed class PermissaoAcessoServico : IPermissaoAcessoServico
         Guid proprietarioId, Guid credencialId, CancellationToken cancellationToken)
     {
         var credencial = await _credenciais.GetByIdAsync(credencialId, cancellationToken).ConfigureAwait(false);
-        if (!PertenceAoProprietario(credencial?.Morador?.Unidade?.Propriedade, proprietarioId))
+        if (!PertenceAoProprietario(credencial?.Morador?.Unidade?.Propriedade, proprietarioId, NivelAcesso.Ver))
         {
             return Result<IReadOnlyList<PermissaoAcessoResponse>>.Fail("Credencial não encontrada.");
         }
@@ -144,8 +149,8 @@ public sealed class PermissaoAcessoServico : IPermissaoAcessoServico
             cancellationToken).ConfigureAwait(false);
     }
 
-    private static bool PertenceAoProprietario(Propriedade? propriedade, Guid proprietarioId) =>
-        propriedade is not null && propriedade.ProprietarioId == proprietarioId;
+    private bool PertenceAoProprietario(Propriedade? propriedade, Guid proprietarioId, NivelAcesso nivel = NivelAcesso.Alterar) =>
+        propriedade is not null && _acesso.Pode(proprietarioId, propriedade, nivel);
 
     private static PermissaoAcessoResponse ToDto(PermissaoAcesso permissao, string pontoAcessoNome) => new()
     {

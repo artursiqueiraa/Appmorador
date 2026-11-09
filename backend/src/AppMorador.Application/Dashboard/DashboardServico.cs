@@ -1,3 +1,4 @@
+using AppMorador.Application.Rbac;
 using AppMorador.Application.Autorizacoes;
 using AppMorador.Application.Common;
 using AppMorador.Application.Operacional;
@@ -14,6 +15,8 @@ namespace AppMorador.Application.Dashboard;
 /// </summary>
 public sealed class DashboardServico : IDashboardServico
 {
+    private readonly IAcessoPropriedadeServico _acesso;
+
     private readonly IPropriedadeRepositorio _propriedades;
     private readonly IUnidadeRepositorio _unidades;
     private readonly IMoradorRepositorio _moradores;
@@ -45,8 +48,10 @@ public sealed class DashboardServico : IDashboardServico
         IEventoEquipamentoRepositorio eventosEquipamento,
         IStatusCentralJflRepositorio statusCentralJfl,
         ISnapshotOperacionalServico snapshotOperacional,
-        IConsultaDashboardServico queryService)
+        IConsultaDashboardServico queryService,
+        IAcessoPropriedadeServico acesso)
     {
+        _acesso = acesso;
         _propriedades = propriedades;
         _unidades = unidades;
         _moradores = moradores;
@@ -67,7 +72,7 @@ public sealed class DashboardServico : IDashboardServico
     public async Task<Result<DashboardResponse>> GetAsync(Guid proprietarioId, Guid propriedadeId, CancellationToken cancellationToken)
     {
         var propriedade = await _propriedades.GetByIdAsync(propriedadeId, cancellationToken).ConfigureAwait(false);
-        if (propriedade is null || propriedade.ProprietarioId != proprietarioId)
+        if (propriedade is null || !_acesso.Pode(proprietarioId, propriedade, NivelAcesso.Ver))
         {
             return Result<DashboardResponse>.Fail("Propriedade não encontrada.");
         }
@@ -157,8 +162,9 @@ public sealed class DashboardServico : IDashboardServico
         if (raw.UltimaOcorrenciaCodigoContactId is not null &&
             ContactIdCatalog.TryGet(raw.UltimaOcorrenciaCodigoContactId, out var definicao))
         {
+            // Sprint 24 — eventos do sistema (energia, bateria da central, pânico) não têm zona.
             var local = raw.UltimaOcorrenciaNomeZona ?? "um local monitorado";
-            ultimoEvento = $"{definicao!.FriendlyMessage} em {local}";
+            ultimoEvento = definicao!.UsaZona ? $"{definicao.FriendlyMessage} em {local}" : definicao.FriendlyMessage;
         }
 
         var dto = new DashboardResponse

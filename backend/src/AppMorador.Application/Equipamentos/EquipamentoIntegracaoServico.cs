@@ -1,4 +1,5 @@
 using AppMorador.Application.Common;
+using AppMorador.Application.Rbac;
 using AppMorador.Application.ControlId;
 using AppMorador.Application.Operacional;
 using AppMorador.Domain.Entities;
@@ -15,6 +16,7 @@ namespace AppMorador.Application.Equipamentos;
 /// </summary>
 public sealed class EquipamentoIntegracaoServico : IEquipamentoIntegracaoServico
 {
+    private readonly IAcessoPropriedadeServico _acesso;
     private readonly IEquipamentoRepositorio _equipamentos;
     private readonly IMoradorRepositorio _moradores;
     private readonly ICredencialRepositorio _credenciais;
@@ -32,8 +34,10 @@ public sealed class EquipamentoIntegracaoServico : IEquipamentoIntegracaoServico
         IEventoEquipamentoRepositorio eventosEquipamento,
         ICriptografiaSimetrica criptografia,
         IControlIdProvider controlIdProvider,
-        ISnapshotOperacionalServico snapshotOperacional)
+        ISnapshotOperacionalServico snapshotOperacional,
+        IAcessoPropriedadeServico acesso)
     {
+        _acesso = acesso;
         _equipamentos = equipamentos;
         _moradores = moradores;
         _credenciais = credenciais;
@@ -274,7 +278,7 @@ public sealed class EquipamentoIntegracaoServico : IEquipamentoIntegracaoServico
     private async Task<Equipamento?> ObterEquipamentoDoProprietarioAsync(Guid proprietarioId, Guid equipamentoId, CancellationToken cancellationToken)
     {
         var equipamento = await _equipamentos.GetByIdAsync(equipamentoId, cancellationToken).ConfigureAwait(false);
-        return equipamento?.Propriedade is not null && equipamento.Propriedade.ProprietarioId == proprietarioId ? equipamento : null;
+        return equipamento?.Propriedade is not null && _acesso.Pode(proprietarioId, equipamento.Propriedade, NivelAcesso.Alterar) ? equipamento : null;
     }
 
     // Hoje só ControlId tem Provider real (ver ADR 0014) — outros fabricantes ganham o

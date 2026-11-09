@@ -8,6 +8,15 @@ namespace AppMorador.Domain.Entities;
 /// </summary>
 public enum PerfilPropriedade
 {
+    /// <summary>Sprint 25 — exibido como "Proprietário": pode tudo.</summary>
     Administrador = 1,
+
+    /// <summary>Sprint 25 — exibido como "Membro": ver, armar/desarmar, abrir portões, pânico.</summary>
     Morador = 2,
+
+    /// <summary>Sprint 25 — tudo, menos gerenciar pessoas e excluir a propriedade.</summary>
+    Gerente = 3,
+
+    /// <summary>Sprint 25 — só ver (câmeras, histórico, status) e confirmar alertas.</summary>
+    Visualizador = 4,
 }

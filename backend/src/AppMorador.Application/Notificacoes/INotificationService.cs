@@ -9,4 +9,7 @@ namespace AppMorador.Application.Notificacoes;
 public interface INotificationService
 {
     Task EnviarParaPropriedadeAsync(NotificacaoPayload payload, CancellationToken cancellationToken);
+
+    /// <summary>Sprint 24 (ADR 0040) — mesmo filtro de canal, para uma lista explícita de usuários.</summary>
+    Task EnviarParaUsuariosAsync(NotificacaoPayload payload, IReadOnlyCollection<Guid> usuarioIds, CancellationToken cancellationToken);
 }

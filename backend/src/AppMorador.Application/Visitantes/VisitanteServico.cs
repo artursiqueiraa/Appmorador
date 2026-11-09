@@ -1,3 +1,4 @@
+using AppMorador.Application.Rbac;
 using AppMorador.Application.Common;
 using AppMorador.Domain.Entities;
 using AppMorador.Domain.Repositories;
@@ -7,6 +8,8 @@ namespace AppMorador.Application.Visitantes;
 /// <summary>Ownership resolvido via Visitante→Propriedade.ProprietarioId, mesma cadeia já usada por <see cref="Application.PontosAcesso.PontoAcessoServico"/> (Visitante também pertence direto à Propriedade, ver ADR 0011).</summary>
 public sealed class VisitanteServico : IVisitanteServico
 {
+    private readonly IAcessoPropriedadeServico _acesso;
+
     private readonly IPropriedadeRepositorio _propriedades;
     private readonly IVisitanteRepositorio _visitantes;
     private readonly IAutorizacaoRepositorio _autorizacoes;
@@ -16,8 +19,10 @@ public sealed class VisitanteServico : IVisitanteServico
         IPropriedadeRepositorio propriedades,
         IVisitanteRepositorio visitantes,
         IAutorizacaoRepositorio autorizacoes,
-        IHistoricoVisitanteRepositorio historico)
+        IHistoricoVisitanteRepositorio historico,
+        IAcessoPropriedadeServico acesso)
     {
+        _acesso = acesso;
         _propriedades = propriedades;
         _visitantes = visitantes;
         _autorizacoes = autorizacoes;
@@ -28,7 +33,7 @@ public sealed class VisitanteServico : IVisitanteServico
         Guid proprietarioId, Guid propriedadeId, CriarVisitanteRequest request, CancellationToken cancellationToken)
     {
         var propriedade = await _propriedades.GetByIdAsync(propriedadeId, cancellationToken).ConfigureAwait(false);
-        if (propriedade is null || propriedade.ProprietarioId != proprietarioId)
+        if (propriedade is null || !_acesso.Pode(proprietarioId, propriedade, NivelAcesso.Alterar))
         {
             return Result<VisitanteResponse>.Fail("Propriedade não encontrada.");
         }
@@ -54,7 +59,7 @@ public sealed class VisitanteServico : IVisitanteServico
         Guid proprietarioId, Guid propriedadeId, CancellationToken cancellationToken)
     {
         var propriedade = await _propriedades.GetByIdAsync(propriedadeId, cancellationToken).ConfigureAwait(false);
-        if (propriedade is null || propriedade.ProprietarioId != proprietarioId)
+        if (propriedade is null || !_acesso.Pode(proprietarioId, propriedade, NivelAcesso.Ver))
         {
             return Result<IReadOnlyList<VisitanteResponse>>.Fail("Propriedade não encontrada.");
         }
@@ -121,8 +126,8 @@ public sealed class VisitanteServico : IVisitanteServico
         return Result.Ok();
     }
 
-    private static bool PertenceAoProprietario(Propriedade? propriedade, Guid proprietarioId) =>
-        propriedade is not null && propriedade.ProprietarioId == proprietarioId;
+    private bool PertenceAoProprietario(Propriedade? propriedade, Guid proprietarioId, NivelAcesso nivel = NivelAcesso.Alterar) =>
+        propriedade is not null && _acesso.Pode(proprietarioId, propriedade, nivel);
 
     private static string? NullIfBlank(string? valor) => string.IsNullOrWhiteSpace(valor) ? null : valor.Trim();
 

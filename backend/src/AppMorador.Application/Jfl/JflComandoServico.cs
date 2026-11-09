@@ -1,3 +1,4 @@
+using AppMorador.Application.Rbac;
 using AppMorador.Application.Common;
 using AppMorador.Application.Notificacoes;
 using AppMorador.Application.Operacional;
@@ -16,6 +17,8 @@ namespace AppMorador.Application.Jfl;
 /// </summary>
 public sealed class JflComandoServico : IJflComandoServico
 {
+    private readonly IAcessoPropriedadeServico _acesso;
+
     private readonly IEquipamentoRepositorio _equipamentos;
     private readonly ICentralRepositorio _centrais;
     private readonly IStatusCentralJflRepositorio _statusCentralJfl;
@@ -29,8 +32,10 @@ public sealed class JflComandoServico : IJflComandoServico
         IStatusCentralJflRepositorio statusCentralJfl,
         IJflProvider jflProvider,
         ISnapshotOperacionalServico snapshotOperacional,
-        INotificationDispatcher notificationDispatcher)
+        INotificationDispatcher notificationDispatcher,
+        IAcessoPropriedadeServico acesso)
     {
+        _acesso = acesso;
         _equipamentos = equipamentos;
         _centrais = centrais;
         _statusCentralJfl = statusCentralJfl;
@@ -41,7 +46,7 @@ public sealed class JflComandoServico : IJflComandoServico
 
     public async Task<Result<CentralJflResponse>> ObterDetalhesAsync(Guid proprietarioId, Guid equipamentoId, CancellationToken cancellationToken)
     {
-        var equipamento = await ResolverEquipamentoJflAsync(proprietarioId, equipamentoId, cancellationToken).ConfigureAwait(false);
+        var equipamento = await ResolverEquipamentoJflAsync(proprietarioId, equipamentoId, NivelAcesso.Ver, cancellationToken).ConfigureAwait(false);
         if (equipamento is null)
         {
             return Result<CentralJflResponse>.Fail("Central JFL não encontrada.");
@@ -58,7 +63,7 @@ public sealed class JflComandoServico : IJflComandoServico
 
     public async Task<Result<ResultadoTesteConexaoJfl>> TestarConexaoAsync(Guid proprietarioId, Guid equipamentoId, CancellationToken cancellationToken)
     {
-        var equipamento = await ResolverEquipamentoJflAsync(proprietarioId, equipamentoId, cancellationToken).ConfigureAwait(false);
+        var equipamento = await ResolverEquipamentoJflAsync(proprietarioId, equipamentoId, NivelAcesso.Alterar, cancellationToken).ConfigureAwait(false);
         if (equipamento is null)
         {
             return Result<ResultadoTesteConexaoJfl>.Fail("Central JFL não encontrada.");
@@ -113,7 +118,7 @@ public sealed class JflComandoServico : IJflComandoServico
     private async Task<Result<ResultadoComandoJfl>> AtualizarInibicaoAsync(
         Guid proprietarioId, Guid equipamentoId, int zonaNumero, bool inibir, CancellationToken cancellationToken)
     {
-        var equipamento = await ResolverEquipamentoJflAsync(proprietarioId, equipamentoId, cancellationToken).ConfigureAwait(false);
+        var equipamento = await ResolverEquipamentoJflAsync(proprietarioId, equipamentoId, NivelAcesso.Operar, cancellationToken).ConfigureAwait(false);
         if (equipamento is null)
         {
             return Result<ResultadoComandoJfl>.Fail("Central JFL não encontrada.");
@@ -153,7 +158,7 @@ public sealed class JflComandoServico : IJflComandoServico
         Guid proprietarioId, Guid equipamentoId, Func<string, CancellationToken, Task<ResultadoComandoJfl>> executar,
         EventoNotificacaoTipo? notificarEmSucesso, CancellationToken cancellationToken)
     {
-        var equipamento = await ResolverEquipamentoJflAsync(proprietarioId, equipamentoId, cancellationToken).ConfigureAwait(false);
+        var equipamento = await ResolverEquipamentoJflAsync(proprietarioId, equipamentoId, NivelAcesso.Operar, cancellationToken).ConfigureAwait(false);
         if (equipamento is null)
         {
             return Result<ResultadoComandoJfl>.Fail("Central JFL não encontrada.");
@@ -227,10 +232,10 @@ public sealed class JflComandoServico : IJflComandoServico
     private Task PublicarAtualizacaoAsync(Guid propriedadeId, CancellationToken cancellationToken) =>
         _snapshotOperacional.RegenerarEPublicarAsync(propriedadeId, MotivoAtualizacaoOperacional.EquipamentoStatusAlterado, cancellationToken);
 
-    private async Task<Equipamento?> ResolverEquipamentoJflAsync(Guid proprietarioId, Guid equipamentoId, CancellationToken cancellationToken)
+    private async Task<Equipamento?> ResolverEquipamentoJflAsync(Guid proprietarioId, Guid equipamentoId, NivelAcesso nivel, CancellationToken cancellationToken)
     {
         var equipamento = await _equipamentos.GetByIdAsync(equipamentoId, cancellationToken).ConfigureAwait(false);
-        if (equipamento?.Propriedade is null || equipamento.Propriedade.ProprietarioId != proprietarioId)
+        if (equipamento?.Propriedade is null || !_acesso.Pode(proprietarioId, equipamento.Propriedade, nivel))
         {
             return null;
         }

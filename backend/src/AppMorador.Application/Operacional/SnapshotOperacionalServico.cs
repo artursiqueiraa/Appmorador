@@ -1,3 +1,4 @@
+using AppMorador.Application.Rbac;
 using AppMorador.Application.Common;
 using AppMorador.Application.Eventos;
 using AppMorador.Domain.Entities;
@@ -15,6 +16,8 @@ namespace AppMorador.Application.Operacional;
 /// </summary>
 public sealed class SnapshotOperacionalServico : ISnapshotOperacionalServico
 {
+    private readonly IAcessoPropriedadeServico _acesso;
+
     private readonly IPropriedadeRepositorio _propriedades;
     private readonly IEquipamentoRepositorio _equipamentos;
     private readonly IStatusCentralJflRepositorio _statusCentralJfl;
@@ -30,8 +33,10 @@ public sealed class SnapshotOperacionalServico : ISnapshotOperacionalServico
         ISnapshotOperacionalRepositorio snapshots,
         IEventosServico eventosServico,
         IClassificadorOperacionalServico classificador,
-        IOperacionalEventoPublicador publicador)
+        IOperacionalEventoPublicador publicador,
+        IAcessoPropriedadeServico acesso)
     {
+        _acesso = acesso;
         _propriedades = propriedades;
         _equipamentos = equipamentos;
         _statusCentralJfl = statusCentralJfl;
@@ -44,7 +49,7 @@ public sealed class SnapshotOperacionalServico : ISnapshotOperacionalServico
     public async Task<Result<SnapshotOperacionalResponse>> ObterAsync(Guid proprietarioId, Guid propriedadeId, CancellationToken cancellationToken)
     {
         var propriedade = await _propriedades.GetByIdAsync(propriedadeId, cancellationToken).ConfigureAwait(false);
-        if (propriedade is null || propriedade.ProprietarioId != proprietarioId)
+        if (propriedade is null || !_acesso.Pode(proprietarioId, propriedade, NivelAcesso.Ver))
         {
             return Result<SnapshotOperacionalResponse>.Fail("Propriedade não encontrada.");
         }
@@ -70,7 +75,7 @@ public sealed class SnapshotOperacionalServico : ISnapshotOperacionalServico
     public async Task<Result<SnapshotOperacionalResponse>> AtualizarAsync(Guid proprietarioId, Guid propriedadeId, CancellationToken cancellationToken)
     {
         var propriedade = await _propriedades.GetByIdAsync(propriedadeId, cancellationToken).ConfigureAwait(false);
-        if (propriedade is null || propriedade.ProprietarioId != proprietarioId)
+        if (propriedade is null || !_acesso.Pode(proprietarioId, propriedade, NivelAcesso.Ver))
         {
             return Result<SnapshotOperacionalResponse>.Fail("Propriedade não encontrada.");
         }

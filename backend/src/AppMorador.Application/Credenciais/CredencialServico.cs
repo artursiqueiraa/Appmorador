@@ -1,3 +1,4 @@
+using AppMorador.Application.Rbac;
 using AppMorador.Application.Common;
 using AppMorador.Domain.Entities;
 using AppMorador.Domain.Repositories;
@@ -13,6 +14,8 @@ namespace AppMorador.Application.Credenciais;
 /// </summary>
 public sealed class CredencialServico : ICredencialServico
 {
+    private readonly IAcessoPropriedadeServico _acesso;
+
     private readonly IMoradorRepositorio _moradores;
     private readonly ICredencialRepositorio _credenciais;
     private readonly IPermissaoAcessoRepositorio _permissoes;
@@ -22,8 +25,10 @@ public sealed class CredencialServico : ICredencialServico
         IMoradorRepositorio moradores,
         ICredencialRepositorio credenciais,
         IPermissaoAcessoRepositorio permissoes,
-        IHistoricoCredencialRepositorio historico)
+        IHistoricoCredencialRepositorio historico,
+        IAcessoPropriedadeServico acesso)
     {
+        _acesso = acesso;
         _moradores = moradores;
         _credenciais = credenciais;
         _permissoes = permissoes;
@@ -61,7 +66,7 @@ public sealed class CredencialServico : ICredencialServico
         Guid proprietarioId, Guid moradorId, CancellationToken cancellationToken)
     {
         var morador = await _moradores.GetByIdAsync(moradorId, cancellationToken).ConfigureAwait(false);
-        if (!PertenceAoProprietario(morador?.Unidade?.Propriedade, proprietarioId))
+        if (!PertenceAoProprietario(morador?.Unidade?.Propriedade, proprietarioId, NivelAcesso.Ver))
         {
             return Result<IReadOnlyList<CredencialResponse>>.Fail("Morador não encontrado.");
         }
@@ -149,8 +154,8 @@ public sealed class CredencialServico : ICredencialServico
     // Mesma mensagem para "nao existe" e "existe mas nao e do usuario" (padrao ja
     // usado desde a Sprint 6) — nao revela para o cliente que um registro de outro
     // dono existe com este Id.
-    private static bool PertenceAoProprietario(Propriedade? propriedade, Guid proprietarioId) =>
-        propriedade is not null && propriedade.ProprietarioId == proprietarioId;
+    private bool PertenceAoProprietario(Propriedade? propriedade, Guid proprietarioId, NivelAcesso nivel = NivelAcesso.Alterar) =>
+        propriedade is not null && _acesso.Pode(proprietarioId, propriedade, nivel);
 
     private static CredencialResponse ToDto(Credencial credencial) => new()
     {

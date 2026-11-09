@@ -27,4 +27,20 @@ public interface IControlIdProvider
 
     /// <summary>Importação sob demanda (poller mínimo, decisão da Fase 1) — nunca um serviço de background contínuo (fora de escopo).</summary>
     Task<IReadOnlyList<EventoImportado>> ImportarEventosAsync(ConexaoEquipamento conexao, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Sprint 24.5 — abre a porta/relé <paramref name="porta"/> (1, 2…) do equipamento. Comando
+    /// `execute_actions` com a ação "door" da API HTTP pública do Control iD; validado no simulador
+    /// local, pendente de homologação no aparelho físico.
+    /// </summary>
+    Task<ResultadoTesteConexao> AbrirPortaAsync(ConexaoEquipamento conexao, int porta, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Sprint 26 (ADR 0042) — garante a pessoa no leitor (registration = id do morador) e envia o rosto
+    /// (`user_set_image`). Pendente de homologação no aparelho físico.
+    /// </summary>
+    Task<ResultadoTesteConexao> EnviarFotoAsync(ConexaoEquipamento conexao, Guid moradorId, string nome, byte[] foto, CancellationToken cancellationToken);
+
+    /// <summary>Sprint 26 — apaga o rosto da pessoa no leitor (`user_destroy_image`).</summary>
+    Task<ResultadoTesteConexao> RemoverFotoAsync(ConexaoEquipamento conexao, Guid moradorId, CancellationToken cancellationToken);
 }

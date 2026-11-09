@@ -17,4 +17,14 @@ public enum EventoNotificacaoTipo
     VisitanteAutorizado,
     EntregaRecebida,
     EquipamentoOffline,
+
+    // Sprint 24 (ADR 0040) — alertas confiáveis.
+    PanicoAcionado,
+    ViolacaoDetectada,
+    CentralSemComunicacao,
+    FalhaEnergia,
+    BateriaBaixa,
+
+    /// <summary>Alerta crítico sem confirmação avisando o próximo nível (membros).</summary>
+    AlertaEscalonado,
 }

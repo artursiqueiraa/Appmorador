@@ -22,6 +22,13 @@ internal sealed class UsuarioPropriedadeRepositorio : IUsuarioPropriedadeReposit
             .Include(v => v.Propriedade)
             .FirstOrDefaultAsync(v => v.Id == id, cancellationToken);
 
+    public async Task<IReadOnlyList<UsuarioPropriedade>> ListAtivosByUsuarioAsync(Guid usuarioId, CancellationToken cancellationToken) =>
+        await _db.UsuariosPropriedade
+            .AsNoTracking()
+            .Where(v => v.UsuarioId == usuarioId && v.Ativo)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
     public async Task<IReadOnlyList<UsuarioPropriedade>> ListByPropriedadeAsync(Guid propriedadeId, CancellationToken cancellationToken) =>
         await _db.UsuariosPropriedade
             .Include(v => v.Usuario)

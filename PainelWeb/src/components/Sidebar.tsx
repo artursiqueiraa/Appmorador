@@ -1,112 +1,89 @@
-import { useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import {
-  Drawer,
-  List,
-  ListItemButton,
-  ListItemIcon,
-  ListItemText,
-  Toolbar,
-  Typography,
-  Divider,
-  Box,
-} from '@mui/material';
-import DashboardIcon from '@mui/icons-material/Dashboard';
-import PeopleIcon from '@mui/icons-material/People';
-import SupportAgentIcon from '@mui/icons-material/SupportAgent';
-import HistoryIcon from '@mui/icons-material/History';
-import DescriptionIcon from '@mui/icons-material/Description';
-import DevicesIcon from '@mui/icons-material/Devices';
-import Inventory2Icon from '@mui/icons-material/Inventory2';
-import MonitorHeartIcon from '@mui/icons-material/MonitorHeart';
+import { Box, Drawer, List, ListItemButton, ListItemIcon, ListItemText, Typography } from '@mui/material';
 import { usePermissao } from '../hooks/usePermissao';
+import { GRUPOS_NAVEGACAO, itemAtivo } from '../routes/navegacao';
+import { layout } from '../styles/tokens';
+import { MarcaAkteck } from './marca/MarcaAkteck';
 
-export const SIDEBAR_WIDTH = 240;
+const SIDEBAR_WIDTH = layout.sidebarWidth;
 
-interface ItemMenu {
-  rotulo: string;
-  rota: string;
-  icone: typeof DashboardIcon;
-  /** Se ausente, visível para qualquer interno. */
-  visivelPara?: () => boolean;
+interface SidebarProps {
+  /** Abaixo de 960px o menu vira gaveta temporária, aberta pelo botão do cabeçalho. */
+  temporario: boolean;
+  aberto: boolean;
+  onFechar: () => void;
 }
 
-export function Sidebar() {
+/**
+ * Akteck Seg (ADR 0035) — menu agrupado por área (Visão geral / Clientes / Equipamentos /
+ * Suporte / Administração), com a marca no topo. Grupos sem nenhum item visível para o
+ * papel atual não aparecem.
+ */
+export function Sidebar({ temporario, aberto, onFechar }: SidebarProps) {
   const navigate = useNavigate();
-  const location = useLocation();
-  const { isMaster, isTecnico, isSuporte, podeVerTudo, podeGerenciarHardware } = usePermissao();
+  const { pathname } = useLocation();
+  const permissoes = usePermissao();
 
-  const itens: ItemMenu[] = useMemo(
-    () => [
-      {
-        rotulo: 'Dashboard',
-        rota: isTecnico && !isMaster && !isSuporte ? '/dashboard-tecnico' : '/dashboard',
-        icone: DashboardIcon,
-      },
-      { rotulo: 'Clientes', rota: '/clientes', icone: PeopleIcon, visivelPara: () => podeVerTudo },
-      {
-        rotulo: 'Equipamentos',
-        rota: '/equipamentos',
-        icone: DevicesIcon,
-        visivelPara: () => podeGerenciarHardware,
-      },
-      {
-        rotulo: 'Provisionamentos',
-        rota: '/provisionamentos',
-        icone: Inventory2Icon,
-        visivelPara: () => podeGerenciarHardware,
-      },
-      {
-        rotulo: 'Diagnóstico de Equipamentos',
-        rota: '/diagnostico-equipamentos',
-        icone: MonitorHeartIcon,
-        visivelPara: () => podeGerenciarHardware,
-      },
-      {
-        rotulo: 'Suporte',
-        rota: '/suporte/selecionar-cliente',
-        icone: SupportAgentIcon,
-        visivelPara: () => podeVerTudo,
-      },
-      { rotulo: 'Sessões Ativas', rota: '/suporte/sessoes-ativas', icone: HistoryIcon, visivelPara: () => podeVerTudo },
-      { rotulo: 'Logs', rota: '/suporte/logs', icone: DescriptionIcon, visivelPara: () => podeVerTudo },
-    ],
-    [isTecnico, isMaster, isSuporte, podeVerTudo, podeGerenciarHardware],
+  const grupos = GRUPOS_NAVEGACAO.map((g) => ({ ...g, itens: g.itens.filter((i) => i.visivel(permissoes)) })).filter(
+    (g) => g.itens.length > 0,
+  );
+
+  const conteudo = (
+    <Box component="nav" aria-label="Menu principal" sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <Box sx={{ height: layout.headerHeight, display: 'flex', alignItems: 'center', px: 2.5 }}>
+        <MarcaAkteck tamanho={28} />
+      </Box>
+      <Box sx={{ flexGrow: 1, overflowY: 'auto', px: 1.5, pb: 2 }}>
+        {grupos.map((grupo) => (
+          <Box key={grupo.rotulo} sx={{ mt: 2 }}>
+            <Typography variant="overline" component="p" sx={{ px: 1.5, mb: 0.5, color: 'text.secondary', display: 'block' }}>
+              {grupo.rotulo}
+            </Typography>
+            <List disablePadding sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}>
+              {grupo.itens.map((item) => {
+                const Icone = item.icone;
+                const ativo = itemAtivo(pathname, item);
+                return (
+                  <ListItemButton
+                    key={item.rota}
+                    selected={ativo}
+                    aria-current={ativo ? 'page' : undefined}
+                    onClick={() => {
+                      navigate(item.rota);
+                      onFechar();
+                    }}
+                    sx={{ px: 1.5 }}
+                  >
+                    <ListItemIcon sx={{ minWidth: 34, color: ativo ? 'primary.main' : 'text.secondary' }}>
+                      <Icone fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText
+                      primary={item.rotulo}
+                      slotProps={{ primary: { sx: { fontSize: 14, fontWeight: ativo ? 600 : 500 } } }}
+                    />
+                  </ListItemButton>
+                );
+              })}
+            </List>
+          </Box>
+        ))}
+      </Box>
+    </Box>
   );
 
   return (
     <Drawer
-      variant="permanent"
+      variant={temporario ? 'temporary' : 'permanent'}
+      open={temporario ? aberto : true}
+      onClose={onFechar}
+      ModalProps={{ keepMounted: true }}
       sx={{
-        width: SIDEBAR_WIDTH,
+        width: temporario ? undefined : SIDEBAR_WIDTH,
         flexShrink: 0,
-        [`& .MuiDrawer-paper`]: { width: SIDEBAR_WIDTH, boxSizing: 'border-box' },
+        '& .MuiDrawer-paper': { width: SIDEBAR_WIDTH, boxSizing: 'border-box', borderRight: 1, borderColor: 'divider' },
       }}
     >
-      <Toolbar>
-        <Typography variant="h3" noWrap sx={{ fontWeight: 800 }}>
-          AppMorador
-        </Typography>
-      </Toolbar>
-      <Divider />
-      <Box sx={{ flexGrow: 1 }}>
-        <List>
-          {itens
-            .filter((item) => !item.visivelPara || item.visivelPara())
-            .map((item) => {
-              const Icone = item.icone;
-              const ativo = location.pathname.startsWith(item.rota.split('/').slice(0, 2).join('/'));
-              return (
-                <ListItemButton key={item.rota} selected={ativo} onClick={() => navigate(item.rota)}>
-                  <ListItemIcon>
-                    <Icone color={ativo ? 'primary' : undefined} />
-                  </ListItemIcon>
-                  <ListItemText primary={item.rotulo} />
-                </ListItemButton>
-              );
-            })}
-        </List>
-      </Box>
+      {conteudo}
     </Drawer>
   );
 }

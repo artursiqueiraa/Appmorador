@@ -1,3 +1,6 @@
+using AppMorador.Infrastructure.Saude;
+using AppMorador.Infrastructure.Alertas;
+using AppMorador.Infrastructure.Moradores;
 using System.Text;
 using System.Text.Json.Serialization;
 using AppMorador.Api;
@@ -153,6 +156,13 @@ builder.Services.AddSingleton<IOperacionalEventoPublicador, OperacionalHubPublic
 // configurado, opera em modo documentado "sem Firebase" (ver FirebaseOptions).
 builder.Services.AddNotificationsModule(builder.Configuration);
 
+// Sprint 24 (ADR 0040) — alertas confiáveis: alerta crítico com confirmação, escalonamento
+// (dono → membros → contatos de emergência por SMS), contatos de emergência e pânico.
+builder.Services.AddAlertasModule(builder.Configuration);
+
+// Sprint 27 (ADR 0043) — PIN de confirmação, auditoria/idempotência de comandos e saúde do sistema.
+builder.Services.AddSegurancaContaModule();
+
 // Rate limit no login/registro — mitiga brute force e cadastro em massa.
 builder.Services.AddRateLimiter(options =>
 {
@@ -184,7 +194,8 @@ builder.Services.AddCors(options =>
     {
         if (allowedOrigins.Length > 0)
         {
-            policy.WithOrigins(allowedOrigins).AllowAnyHeader().AllowAnyMethod();
+            // Sprint 27 (ADR 0043) — AllowCredentials: o app web manda o cookie HttpOnly do refresh token.
+            policy.WithOrigins(allowedOrigins).AllowAnyHeader().AllowAnyMethod().AllowCredentials();
         }
     });
 });
@@ -229,12 +240,22 @@ builder.Services.AddHostedService<JflServerHostedService>();
 // aditivo sobre AppMorador.Jfl (nenhuma mudança no protocolo em si).
 builder.Services.AddHostedService<AppMorador.Infrastructure.Jfl.EquipamentoJflConexaoObserver>();
 
+// Sprint 24 (ADR 0040) — vigia de conectividade: central sem sessão ou sem keep-alive há mais de
+// 3x o intervalo vira Offline + alerta crítico "Central sem comunicação".
+builder.Services.AddVigiaConectividadeJfl();
+
 // Captura de snapshot (disco local, sem nuvem) — chamada pelo AlarmEventProcessor
 // depois que a Ocorrencia ja foi criada.
 builder.Services.AddSnapshotCapture(options =>
 {
     options.BasePath = builder.Configuration.GetValue("Snapshots:BasePath", "snapshots")!;
     options.TimeoutSeconds = builder.Configuration.GetValue("Snapshots:TimeoutSeconds", 5);
+});
+
+// Akteck Seg (ADR 0036) — fotos de rosto dos moradores, em disco local (fora do git, ver docs/STORAGE.md).
+builder.Services.AddFotosMoradores(options =>
+{
+    options.BasePath = builder.Configuration.GetValue("FotosMoradores:BasePath", "fotos-moradores")!;
 });
 
 var app = builder.Build();
@@ -310,6 +331,20 @@ app.UseCors("Default");
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Sprint 25 (ADR 0041) — carrega uma vez por requisição os vínculos ativos do usuário logado
+// (UsuariosPropriedade); IAcessoPropriedadeServico responde "pode?" sem nova consulta. Remover um
+// membro vale na próxima requisição dele.
+app.Use(async (contexto, proximo) =>
+{
+    if (contexto.User.Identity?.IsAuthenticated == true)
+    {
+        var acesso = contexto.RequestServices.GetRequiredService<AppMorador.Application.Rbac.IAcessoPropriedadeServico>();
+        await acesso.CarregarAsync(contexto.User.GetUsuarioId(), contexto.RequestAborted);
+    }
+
+    await proximo();
+});
 app.UseMiddleware<UsuarioLogadoEnrichmentMiddleware>();
 app.MapControllers();
 

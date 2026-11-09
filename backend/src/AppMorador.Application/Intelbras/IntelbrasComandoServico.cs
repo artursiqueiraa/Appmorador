@@ -1,3 +1,4 @@
+using AppMorador.Application.Rbac;
 using AppMorador.Application.Common;
 using AppMorador.Application.Equipamentos;
 using AppMorador.Application.Operacional;
@@ -8,6 +9,8 @@ namespace AppMorador.Application.Intelbras;
 
 public sealed class IntelbrasComandoServico : IIntelbrasComandoServico
 {
+    private readonly IAcessoPropriedadeServico _acesso;
+
     private readonly IEquipamentoRepositorio _equipamentos;
     private readonly IEventoEquipamentoRepositorio _eventosEquipamento;
     private readonly ICriptografiaSimetrica _criptografia;
@@ -19,8 +22,10 @@ public sealed class IntelbrasComandoServico : IIntelbrasComandoServico
         IEventoEquipamentoRepositorio eventosEquipamento,
         ICriptografiaSimetrica criptografia,
         IIntelbrasProvider intelbrasProvider,
-        ISnapshotOperacionalServico snapshotOperacional)
+        ISnapshotOperacionalServico snapshotOperacional,
+        IAcessoPropriedadeServico acesso)
     {
+        _acesso = acesso;
         _equipamentos = equipamentos;
         _eventosEquipamento = eventosEquipamento;
         _criptografia = criptografia;
@@ -30,7 +35,7 @@ public sealed class IntelbrasComandoServico : IIntelbrasComandoServico
 
     public async Task<Result<CentralIntelbrasResponse>> ObterDetalhesAsync(Guid proprietarioId, Guid equipamentoId, CancellationToken cancellationToken)
     {
-        var equipamento = await ResolverEquipamentoIntelbrasAsync(proprietarioId, equipamentoId, cancellationToken).ConfigureAwait(false);
+        var equipamento = await ResolverEquipamentoIntelbrasAsync(proprietarioId, equipamentoId, NivelAcesso.Ver, cancellationToken).ConfigureAwait(false);
         if (equipamento is null)
         {
             return Result<CentralIntelbrasResponse>.Fail("Central Intelbras não encontrada.");
@@ -41,7 +46,7 @@ public sealed class IntelbrasComandoServico : IIntelbrasComandoServico
 
     public async Task<Result<ResultadoTesteConexaoIntelbras>> TestarConexaoAsync(Guid proprietarioId, Guid equipamentoId, CancellationToken cancellationToken)
     {
-        var equipamento = await ResolverEquipamentoIntelbrasAsync(proprietarioId, equipamentoId, cancellationToken).ConfigureAwait(false);
+        var equipamento = await ResolverEquipamentoIntelbrasAsync(proprietarioId, equipamentoId, NivelAcesso.Alterar, cancellationToken).ConfigureAwait(false);
         if (equipamento is null)
         {
             return Result<ResultadoTesteConexaoIntelbras>.Fail("Central Intelbras não encontrada.");
@@ -68,7 +73,7 @@ public sealed class IntelbrasComandoServico : IIntelbrasComandoServico
 
     public async Task<Result<ImportacaoEventosIntelbrasResponse>> ImportarEventosAsync(Guid proprietarioId, Guid equipamentoId, CancellationToken cancellationToken)
     {
-        var equipamento = await ResolverEquipamentoIntelbrasAsync(proprietarioId, equipamentoId, cancellationToken).ConfigureAwait(false);
+        var equipamento = await ResolverEquipamentoIntelbrasAsync(proprietarioId, equipamentoId, NivelAcesso.Alterar, cancellationToken).ConfigureAwait(false);
         if (equipamento is null)
         {
             return Result<ImportacaoEventosIntelbrasResponse>.Fail("Central Intelbras não encontrada.");
@@ -117,7 +122,7 @@ public sealed class IntelbrasComandoServico : IIntelbrasComandoServico
         Func<ConexaoIntelbras, CancellationToken, Task<ResultadoComandoIntelbras>> executar,
         CancellationToken cancellationToken)
     {
-        var equipamento = await ResolverEquipamentoIntelbrasAsync(proprietarioId, equipamentoId, cancellationToken).ConfigureAwait(false);
+        var equipamento = await ResolverEquipamentoIntelbrasAsync(proprietarioId, equipamentoId, NivelAcesso.Operar, cancellationToken).ConfigureAwait(false);
         if (equipamento is null)
         {
             return Result<ResultadoComandoIntelbras>.Fail("Central Intelbras não encontrada.");
@@ -143,10 +148,10 @@ public sealed class IntelbrasComandoServico : IIntelbrasComandoServico
     private Task PublicarAtualizacaoAsync(Guid propriedadeId, CancellationToken cancellationToken) =>
         _snapshotOperacional.RegenerarEPublicarAsync(propriedadeId, MotivoAtualizacaoOperacional.EquipamentoStatusAlterado, cancellationToken);
 
-    private async Task<Equipamento?> ResolverEquipamentoIntelbrasAsync(Guid proprietarioId, Guid equipamentoId, CancellationToken cancellationToken)
+    private async Task<Equipamento?> ResolverEquipamentoIntelbrasAsync(Guid proprietarioId, Guid equipamentoId, NivelAcesso nivel, CancellationToken cancellationToken)
     {
         var equipamento = await _equipamentos.GetByIdAsync(equipamentoId, cancellationToken).ConfigureAwait(false);
-        if (equipamento?.Propriedade is null || equipamento.Propriedade.ProprietarioId != proprietarioId)
+        if (equipamento?.Propriedade is null || !_acesso.Pode(proprietarioId, equipamento.Propriedade, nivel))
         {
             return null;
         }

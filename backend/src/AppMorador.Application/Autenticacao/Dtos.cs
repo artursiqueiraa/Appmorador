@@ -32,13 +32,13 @@ public sealed class EntrarRequest
 
 public sealed class RefreshRequest
 {
-    [Required(ErrorMessage = "RefreshToken é obrigatório.")]
+    /// <summary>Sprint 27 (ADR 0043) — vazio no app web: o refresh token vem do cookie HttpOnly.</summary>
     public string RefreshToken { get; set; } = string.Empty;
 }
 
 public sealed class SairRequest
 {
-    [Required(ErrorMessage = "RefreshToken é obrigatório.")]
+    /// <summary>Sprint 27 (ADR 0043) — vazio no app web: o refresh token vem do cookie HttpOnly.</summary>
     public string RefreshToken { get; set; } = string.Empty;
 }
 

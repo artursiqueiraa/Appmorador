@@ -1,4 +1,7 @@
 using AppMorador.Api.Auth;
+using AppMorador.Api.Comandos;
+using AppMorador.Application.Comandos;
+using AppMorador.Domain.Entities;
 using AppMorador.Application.Jfl;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -16,11 +19,16 @@ namespace AppMorador.Api.Controllers;
 public sealed class CentraisJflController : ControllerBase
 {
     private readonly IJflComandoServico _jflComandoServico;
+    private readonly IExecucaoComandoServico _execucao;
 
-    public CentraisJflController(IJflComandoServico jflComandoServico)
+    public CentraisJflController(IJflComandoServico jflComandoServico, IExecucaoComandoServico execucao)
     {
         _jflComandoServico = jflComandoServico;
+        _execucao = execucao;
     }
+
+    /// <summary>Sprint 27 (ADR 0043) — o que conta como "a central obedeceu" na auditoria.</summary>
+    private static (bool Sucesso, string? Mensagem) Avaliar(ResultadoComandoJfl resultado) => (resultado.Sucesso, resultado.MensagemErro);
 
     [HttpGet("api/equipamentos/{id:guid}/jfl")]
     public async Task<IActionResult> ObterDetalhes(Guid id, CancellationToken cancellationToken)
@@ -59,98 +67,66 @@ public sealed class CentraisJflController : ControllerBase
     }
 
     [HttpPost("api/equipamentos/{id:guid}/jfl/armar")]
-    public async Task<IActionResult> Armar(Guid id, [FromBody] ParticaoRequest request, CancellationToken cancellationToken)
-    {
-        var result = await _jflComandoServico.ArmarAsync(User.GetUsuarioId(), id, request.Particao, cancellationToken);
-        if (!result.Success)
-        {
-            return NotFound(new { error = result.Error });
-        }
-
-        return Ok(result.Data);
-    }
+    public async Task<IActionResult> Armar(Guid id, [FromBody] ParticaoRequest request, CancellationToken cancellationToken) =>
+        this.ParaResposta(await _execucao.ExecutarAsync(
+            this.Solicitacao(TipoComando.Armar, equipamentoId: id, parametros: $"partição {request.Particao}"),
+            ct => _jflComandoServico.ArmarAsync(User.GetUsuarioId(), id, request.Particao, ct),
+            Avaliar,
+            cancellationToken));
 
     [HttpPost("api/equipamentos/{id:guid}/jfl/desarmar")]
-    public async Task<IActionResult> Desarmar(Guid id, [FromBody] ParticaoRequest request, CancellationToken cancellationToken)
-    {
-        var result = await _jflComandoServico.DesarmarAsync(User.GetUsuarioId(), id, request.Particao, cancellationToken);
-        if (!result.Success)
-        {
-            return NotFound(new { error = result.Error });
-        }
-
-        return Ok(result.Data);
-    }
+    public async Task<IActionResult> Desarmar(Guid id, [FromBody] ParticaoRequest request, CancellationToken cancellationToken) =>
+        this.ParaResposta(await _execucao.ExecutarAsync(
+            this.Solicitacao(TipoComando.Desarmar, equipamentoId: id, parametros: $"partição {request.Particao}"),
+            ct => _jflComandoServico.DesarmarAsync(User.GetUsuarioId(), id, request.Particao, ct),
+            Avaliar,
+            cancellationToken));
 
     [HttpPost("api/equipamentos/{id:guid}/jfl/armar-stay")]
-    public async Task<IActionResult> ArmarStay(Guid id, [FromBody] ParticaoRequest request, CancellationToken cancellationToken)
-    {
-        var result = await _jflComandoServico.ArmarStayAsync(User.GetUsuarioId(), id, request.Particao, cancellationToken);
-        if (!result.Success)
-        {
-            return NotFound(new { error = result.Error });
-        }
-
-        return Ok(result.Data);
-    }
+    public async Task<IActionResult> ArmarStay(Guid id, [FromBody] ParticaoRequest request, CancellationToken cancellationToken) =>
+        this.ParaResposta(await _execucao.ExecutarAsync(
+            this.Solicitacao(TipoComando.ArmarStay, equipamentoId: id, parametros: $"partição {request.Particao}"),
+            ct => _jflComandoServico.ArmarStayAsync(User.GetUsuarioId(), id, request.Particao, ct),
+            Avaliar,
+            cancellationToken));
 
     [HttpPost("api/equipamentos/{id:guid}/jfl/armar-away")]
-    public async Task<IActionResult> ArmarAway(Guid id, [FromBody] ParticaoRequest request, CancellationToken cancellationToken)
-    {
-        var result = await _jflComandoServico.ArmarAwayAsync(User.GetUsuarioId(), id, request.Particao, cancellationToken);
-        if (!result.Success)
-        {
-            return NotFound(new { error = result.Error });
-        }
-
-        return Ok(result.Data);
-    }
+    public async Task<IActionResult> ArmarAway(Guid id, [FromBody] ParticaoRequest request, CancellationToken cancellationToken) =>
+        this.ParaResposta(await _execucao.ExecutarAsync(
+            this.Solicitacao(TipoComando.ArmarAway, equipamentoId: id, parametros: $"partição {request.Particao}"),
+            ct => _jflComandoServico.ArmarAwayAsync(User.GetUsuarioId(), id, request.Particao, ct),
+            Avaliar,
+            cancellationToken));
 
     [HttpPost("api/equipamentos/{id:guid}/jfl/pgm/acionar")]
-    public async Task<IActionResult> AcionarPgm(Guid id, [FromBody] PgmRequest request, CancellationToken cancellationToken)
-    {
-        var result = await _jflComandoServico.AcionarPgmAsync(User.GetUsuarioId(), id, request.PgmNumero, cancellationToken);
-        if (!result.Success)
-        {
-            return NotFound(new { error = result.Error });
-        }
-
-        return Ok(result.Data);
-    }
+    public async Task<IActionResult> AcionarPgm(Guid id, [FromBody] PgmRequest request, CancellationToken cancellationToken) =>
+        this.ParaResposta(await _execucao.ExecutarAsync(
+            this.Solicitacao(TipoComando.AcionarPgm, equipamentoId: id, parametros: $"PGM {request.PgmNumero}"),
+            ct => _jflComandoServico.AcionarPgmAsync(User.GetUsuarioId(), id, request.PgmNumero, ct),
+            Avaliar,
+            cancellationToken));
 
     [HttpPost("api/equipamentos/{id:guid}/jfl/pgm/desligar")]
-    public async Task<IActionResult> DesligarPgm(Guid id, [FromBody] PgmRequest request, CancellationToken cancellationToken)
-    {
-        var result = await _jflComandoServico.DesligarPgmAsync(User.GetUsuarioId(), id, request.PgmNumero, cancellationToken);
-        if (!result.Success)
-        {
-            return NotFound(new { error = result.Error });
-        }
-
-        return Ok(result.Data);
-    }
+    public async Task<IActionResult> DesligarPgm(Guid id, [FromBody] PgmRequest request, CancellationToken cancellationToken) =>
+        this.ParaResposta(await _execucao.ExecutarAsync(
+            this.Solicitacao(TipoComando.DesligarPgm, equipamentoId: id, parametros: $"PGM {request.PgmNumero}"),
+            ct => _jflComandoServico.DesligarPgmAsync(User.GetUsuarioId(), id, request.PgmNumero, ct),
+            Avaliar,
+            cancellationToken));
 
     [HttpPost("api/equipamentos/{id:guid}/jfl/zonas/inibir")]
-    public async Task<IActionResult> InibirZona(Guid id, [FromBody] ZonaRequest request, CancellationToken cancellationToken)
-    {
-        var result = await _jflComandoServico.InibirZonaAsync(User.GetUsuarioId(), id, request.ZonaNumero, cancellationToken);
-        if (!result.Success)
-        {
-            return NotFound(new { error = result.Error });
-        }
-
-        return Ok(result.Data);
-    }
+    public async Task<IActionResult> InibirZona(Guid id, [FromBody] ZonaRequest request, CancellationToken cancellationToken) =>
+        this.ParaResposta(await _execucao.ExecutarAsync(
+            this.Solicitacao(TipoComando.InibirZona, equipamentoId: id, parametros: $"zona {request.ZonaNumero}"),
+            ct => _jflComandoServico.InibirZonaAsync(User.GetUsuarioId(), id, request.ZonaNumero, ct),
+            Avaliar,
+            cancellationToken));
 
     [HttpPost("api/equipamentos/{id:guid}/jfl/zonas/desinibir")]
-    public async Task<IActionResult> DesinibirZona(Guid id, [FromBody] ZonaRequest request, CancellationToken cancellationToken)
-    {
-        var result = await _jflComandoServico.DesinibirZonaAsync(User.GetUsuarioId(), id, request.ZonaNumero, cancellationToken);
-        if (!result.Success)
-        {
-            return NotFound(new { error = result.Error });
-        }
-
-        return Ok(result.Data);
-    }
+    public async Task<IActionResult> DesinibirZona(Guid id, [FromBody] ZonaRequest request, CancellationToken cancellationToken) =>
+        this.ParaResposta(await _execucao.ExecutarAsync(
+            this.Solicitacao(TipoComando.DesinibirZona, equipamentoId: id, parametros: $"zona {request.ZonaNumero}"),
+            ct => _jflComandoServico.DesinibirZonaAsync(User.GetUsuarioId(), id, request.ZonaNumero, ct),
+            Avaliar,
+            cancellationToken));
 }

@@ -248,6 +248,15 @@
 
 ## Próximo
 
+- **Plano de Ação de Produto (Sprints 23–32)**: priorização aprovada em 2026-11-08 a partir do
+  parecer técnico — base única, alertas confiáveis, multiusuário, facial + LGPD, segurança da conta,
+  rotina e relatórios, acessos temporários, câmeras ao vivo, mobilidade e produto comercial. Ver
+  [PLANO_ACAO_PRODUTO.md](PLANO_ACAO_PRODUTO.md). Homologação física de Control iD, Hikvision e JFL
+  segue pendente e é pré-requisito de venda.
+- **Sprint 23 — Base única (web + Android + iOS)**: concluída em 2026-11-08 — o `webapp/` gera web
+  e APK (ADR 0039); APK aprovado em dispositivo; `mobile/` arquivado na tag `mobile-legado`.
+- **Sprint 24 — Alertas confiáveis**: concluída em 2026-11-08 (ADR 0040); push com app fechado depende do Firebase (dívida 65).
+  Próxima: **Sprint 24.5 — Portões e portas** ([SPRINT_024_5.md](../sprints/SPRINT_024_5.md)), em implementação.
 - **Sprint 22C — Plataforma de Execução de Comandos de Hardware**: ainda não iniciada. Decisão
   arquitetural já aprovada pela ARB (ADR 0033, Rev. 2) — `ProviderType`/`HardwareCommandType`
   como identificadores estáveis (não strings soltas), Command Registry central

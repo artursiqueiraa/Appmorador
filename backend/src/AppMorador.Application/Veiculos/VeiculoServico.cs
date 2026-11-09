@@ -1,3 +1,4 @@
+using AppMorador.Application.Rbac;
 using AppMorador.Application.Common;
 using AppMorador.Domain.Entities;
 using AppMorador.Domain.Repositories;
@@ -14,6 +15,8 @@ namespace AppMorador.Application.Veiculos;
 /// </summary>
 public sealed class VeiculoServico : IVeiculoServico
 {
+    private readonly IAcessoPropriedadeServico _acesso;
+
     private readonly IMoradorRepositorio _moradores;
     private readonly IVeiculoRepositorio _veiculos;
     private readonly IVinculoVeiculoVagaRepositorio _vinculos;
@@ -25,8 +28,10 @@ public sealed class VeiculoServico : IVeiculoServico
         IVeiculoRepositorio veiculos,
         IVinculoVeiculoVagaRepositorio vinculos,
         IPermissaoVeicularRepositorio permissoesVeiculares,
-        IHistoricoVeiculoRepositorio historico)
+        IHistoricoVeiculoRepositorio historico,
+        IAcessoPropriedadeServico acesso)
     {
+        _acesso = acesso;
         _moradores = moradores;
         _veiculos = veiculos;
         _vinculos = vinculos;
@@ -77,7 +82,7 @@ public sealed class VeiculoServico : IVeiculoServico
         Guid proprietarioId, Guid moradorId, CancellationToken cancellationToken)
     {
         var morador = await _moradores.GetByIdAsync(moradorId, cancellationToken).ConfigureAwait(false);
-        if (!PertenceAoProprietario(morador, proprietarioId))
+        if (!PertenceAoProprietario(morador, proprietarioId, NivelAcesso.Ver))
         {
             return Result<IReadOnlyList<VeiculoResponse>>.Fail("Morador não encontrado.");
         }
@@ -164,11 +169,11 @@ public sealed class VeiculoServico : IVeiculoServico
 
     private static string NormalizarPlaca(string placa) => placa.Trim().ToUpperInvariant();
 
-    private static bool PertenceAoProprietario(Morador? morador, Guid proprietarioId) =>
-        morador?.Unidade?.Propriedade is not null && morador.Unidade.Propriedade.ProprietarioId == proprietarioId;
+    private bool PertenceAoProprietario(Morador? morador, Guid proprietarioId, NivelAcesso nivel = NivelAcesso.Alterar) =>
+        morador?.Unidade?.Propriedade is not null && _acesso.Pode(proprietarioId, morador.Unidade.Propriedade, nivel);
 
-    private static bool PertenceAoProprietario(Veiculo? veiculo, Guid proprietarioId) =>
-        veiculo?.Morador?.Unidade?.Propriedade is not null && veiculo.Morador.Unidade.Propriedade.ProprietarioId == proprietarioId;
+    private bool PertenceAoProprietario(Veiculo? veiculo, Guid proprietarioId, NivelAcesso nivel = NivelAcesso.Alterar) =>
+        veiculo?.Morador?.Unidade?.Propriedade is not null && _acesso.Pode(proprietarioId, veiculo.Morador.Unidade.Propriedade, nivel);
 
     private static string? NullIfBlank(string? valor) => string.IsNullOrWhiteSpace(valor) ? null : valor.Trim();
 

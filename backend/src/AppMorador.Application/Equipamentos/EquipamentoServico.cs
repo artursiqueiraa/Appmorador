@@ -1,3 +1,4 @@
+using AppMorador.Application.Rbac;
 using AppMorador.Application.Common;
 using AppMorador.Domain.Entities;
 using AppMorador.Domain.Repositories;
@@ -12,6 +13,8 @@ namespace AppMorador.Application.Equipamentos;
 /// </summary>
 public sealed class EquipamentoServico : IEquipamentoServico
 {
+    private readonly IAcessoPropriedadeServico _acesso;
+
     private readonly IPropriedadeRepositorio _propriedades;
     private readonly IEquipamentoRepositorio _equipamentos;
     private readonly IModeloEquipamentoRepositorio _modelosEquipamento;
@@ -21,8 +24,10 @@ public sealed class EquipamentoServico : IEquipamentoServico
         IPropriedadeRepositorio propriedades,
         IEquipamentoRepositorio equipamentos,
         IModeloEquipamentoRepositorio modelosEquipamento,
-        ICriptografiaSimetrica criptografia)
+        ICriptografiaSimetrica criptografia,
+        IAcessoPropriedadeServico acesso)
     {
+        _acesso = acesso;
         _propriedades = propriedades;
         _equipamentos = equipamentos;
         _modelosEquipamento = modelosEquipamento;
@@ -33,7 +38,7 @@ public sealed class EquipamentoServico : IEquipamentoServico
         Guid proprietarioId, Guid propriedadeId, CriarEquipamentoRequest request, CancellationToken cancellationToken)
     {
         var propriedade = await _propriedades.GetByIdAsync(propriedadeId, cancellationToken).ConfigureAwait(false);
-        if (propriedade is null || propriedade.ProprietarioId != proprietarioId)
+        if (propriedade is null || !_acesso.Pode(proprietarioId, propriedade, NivelAcesso.Alterar))
         {
             return Result<EquipamentoResponse>.Fail("Propriedade não encontrada.");
         }
@@ -107,7 +112,7 @@ public sealed class EquipamentoServico : IEquipamentoServico
         Guid proprietarioId, Guid propriedadeId, CancellationToken cancellationToken)
     {
         var propriedade = await _propriedades.GetByIdAsync(propriedadeId, cancellationToken).ConfigureAwait(false);
-        if (propriedade is null || propriedade.ProprietarioId != proprietarioId)
+        if (propriedade is null || !_acesso.Pode(proprietarioId, propriedade, NivelAcesso.Ver))
         {
             return Result<IReadOnlyList<EquipamentoResponse>>.Fail("Propriedade não encontrada.");
         }
@@ -119,7 +124,7 @@ public sealed class EquipamentoServico : IEquipamentoServico
     public async Task<Result<EquipamentoResponse>> GetByIdAsync(Guid proprietarioId, Guid equipamentoId, CancellationToken cancellationToken)
     {
         var equipamento = await _equipamentos.GetByIdAsync(equipamentoId, cancellationToken).ConfigureAwait(false);
-        if (!PertenceAoProprietario(equipamento, proprietarioId))
+        if (!PertenceAoProprietario(equipamento, proprietarioId, NivelAcesso.Ver))
         {
             return Result<EquipamentoResponse>.Fail("Equipamento não encontrado.");
         }
@@ -212,8 +217,8 @@ public sealed class EquipamentoServico : IEquipamentoServico
         return novo.Id;
     }
 
-    private static bool PertenceAoProprietario(Equipamento? equipamento, Guid proprietarioId) =>
-        equipamento?.Propriedade is not null && equipamento.Propriedade.ProprietarioId == proprietarioId;
+    private bool PertenceAoProprietario(Equipamento? equipamento, Guid proprietarioId, NivelAcesso nivel = NivelAcesso.Alterar) =>
+        equipamento?.Propriedade is not null && _acesso.Pode(proprietarioId, equipamento.Propriedade, nivel);
 
     private static string? NullIfBlank(string? valor) => string.IsNullOrWhiteSpace(valor) ? null : valor.Trim();
 

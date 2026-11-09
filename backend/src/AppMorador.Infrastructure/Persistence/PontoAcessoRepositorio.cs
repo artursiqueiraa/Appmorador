@@ -14,12 +14,18 @@ internal sealed class PontoAcessoRepositorio : IPontoAcessoRepositorio
     }
 
     public Task<PontoAcesso?> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
-        _db.PontosAcesso.Include(p => p.Propriedade).FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
+        _db.PontosAcesso
+            .Include(p => p.Propriedade)
+            .Include(p => p.EquipamentoAcionador)
+            .Include(p => p.Camera)
+            .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
 
     // Sem AsNoTracking: usado tanto para exibicao quanto para o cascade de exclusao
     // (PropriedadeServico.DeleteAsync precisa rastrear e salvar as mudancas).
     public async Task<IReadOnlyList<PontoAcesso>> ListByPropriedadeAsync(Guid propriedadeId, CancellationToken cancellationToken) =>
         await _db.PontosAcesso
+            .Include(p => p.EquipamentoAcionador)
+            .Include(p => p.Camera)
             .Where(p => p.PropriedadeId == propriedadeId)
             .OrderBy(p => p.Nome)
             .ToListAsync(cancellationToken)

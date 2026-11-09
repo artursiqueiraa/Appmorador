@@ -53,7 +53,7 @@ export function LoginPage() {
         required
         fullWidth
       />
-      <Button type="submit" variant="contained" size="large" loading={carregando} fullWidth>
+      <Button type="submit" variant="contained" loading={carregando} fullWidth sx={{ mt: 0.5 }}>
         Entrar
       </Button>
     </Box>

@@ -16,6 +16,9 @@ public interface IUsuarioPropriedadeRepositorio
 
     Task<IReadOnlyList<UsuarioPropriedade>> ListByPropriedadeAsync(Guid propriedadeId, CancellationToken cancellationToken);
 
+    /// <summary>Sprint 25 — vínculos ativos do usuário (carregados uma vez por requisição).</summary>
+    Task<IReadOnlyList<UsuarioPropriedade>> ListAtivosByUsuarioAsync(Guid usuarioId, CancellationToken cancellationToken);
+
     Task AddAsync(UsuarioPropriedade vinculo, CancellationToken cancellationToken);
 
     Task SaveChangesAsync(CancellationToken cancellationToken);

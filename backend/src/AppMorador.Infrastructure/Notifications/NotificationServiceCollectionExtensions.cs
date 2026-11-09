@@ -19,8 +19,8 @@ public static class NotificationServiceCollectionExtensions
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<INotificationDispatcher, NotificationDispatcher>();
 
-        // Singleton: o debounce so funciona se sobreviver entre requests (Fase 8.2).
-        services.AddSingleton<IDebounceNotificacao, DebounceNotificacaoEmMemoria>();
+        // Sprint 24 (ADR 0040) — debounce persistido no banco (sobrevive a reinício); Scoped por usar o AppDbContext.
+        services.AddScoped<IDebounceNotificacao, DebounceNotificacaoPersistido>();
 
         return services;
     }

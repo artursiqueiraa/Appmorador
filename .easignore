@@ -1,0 +1,53 @@
+# Sprint 27 — o EAS (build do APK, EAS_PROJECT_ROOT=webapp) empacota a partir da raiz do repositório.
+# Com este arquivo, o EAS NÃO lê os .gitignore: ele repete as regras deles e tira tudo o que não é
+# o app. Motivo imediato: os atalhos (symlinks) de skills em .agents/.claude quebravam o envio no
+# Windows, e a pasta webapp/android gerada pelo `expo run:android` (emulador) faria o EAS ignorar o
+# app.json.
+
+# Fora do app
+.agents/
+.claude/
+.vscode/
+.idea/
+backend/
+PainelWeb/
+docs/
+marketing/
+database/
+scripts/
+ft/
+
+# Gerado pelo emulador / build local
+webapp/android/
+webapp/ios/
+webapp/.expo/
+webapp/dist/
+webapp/web-build/
+webapp/.kotlin/
+
+# Mesmas regras dos .gitignore
+node_modules/
+*.log
+logs/
+coverage/
+.env
+.env.*
+!.env.example
+*.tsbuildinfo
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.pem
+*.mobileprovision
+.metro-health-check*
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+expo-env.d.ts
+google-services.json
+GoogleService-Info.plist
+*firebase-adminsdk*.json
+.DS_Store
+Thumbs.db

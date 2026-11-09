@@ -9,5 +9,10 @@ namespace AppMorador.Application.Notificacoes;
 /// </summary>
 public interface INotificationDispatcher
 {
+    /// <summary>Envia para o dono da propriedade.</summary>
     Task NotificarAsync(EventoNotificacaoTipo tipo, ContextoNotificacao contexto, CancellationToken cancellationToken);
+
+    /// <summary>Sprint 24 (ADR 0040) — envia para usuários específicos (escalonamento para membros).</summary>
+    Task NotificarUsuariosAsync(
+        EventoNotificacaoTipo tipo, ContextoNotificacao contexto, IReadOnlyCollection<Guid> usuarioIds, CancellationToken cancellationToken);
 }

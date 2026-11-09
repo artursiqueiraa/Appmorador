@@ -1,0 +1,84 @@
+{
+  "expo": {
+    "name": "Akteck Seg",
+    "slug": "appmorador",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0A0E13",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.akteck.seg"
+    },
+    "android": {
+      "package": "com.akteck.seg",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "backgroundColor": "#0A0E13",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro",
+      "output": "single",
+      "name": "Akteck Seg",
+      "shortName": "Akteck Seg",
+      "lang": "pt-BR",
+      "themeColor": "#0A0D12",
+      "backgroundColor": "#0A0D12"
+    },
+    "plugins": [
+      "expo-secure-store",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Use o Face ID para confirmar desarmar o alarme e abrir portões."
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#0A0E13"
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/android-icon-monochrome.png",
+          "color": "#25C98D",
+          "sounds": ["./assets/sons/alerta_critico.wav"]
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "A Akteck Seg usa a câmera para cadastrar o rosto de quem tem acesso ao seu imóvel.",
+          "photosPermission": "A Akteck Seg usa suas fotos apenas quando você escolhe uma imagem para o cadastro facial."
+        }
+      ],
+      "expo-image"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "575724e0-701a-4d0f-b692-20f84ebffecb"
+      }
+    },
+    "owner": "ostresmosqueteiros"
+  }
+}

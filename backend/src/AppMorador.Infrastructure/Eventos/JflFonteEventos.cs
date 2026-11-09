@@ -45,12 +45,11 @@ internal sealed class JflFonteEventos : IFonteEventos
             return (Array.Empty<EventoTimeline>(), 0);
         }
 
-        // Severidade nunca e Informativo nesta fonte (so Critico/Atencao, ver mapeamento
-        // abaixo) — pedir Informativo tambem nunca pode ser satisfeito.
-        if (filtro.Severidade == SeveridadeEvento.Informativo)
-        {
-            return (Array.Empty<EventoTimeline>(), 0);
-        }
+        // Sprint 24 (ADR 0040) — gravidade vem da categoria do catalogo: disparo/panico/violacao
+        // seguem a regra antiga (Critico quando resolvido, senao Atencao); energia/bateria sao
+        // Atencao; restauracoes sao Informativo.
+        var criticos = ContactIdCatalog.CodigosDaCategoria(CategoriaContactId.Disparo, CategoriaContactId.Panico, CategoriaContactId.Violacao);
+        var informativos = ContactIdCatalog.CodigosDaCategoria(CategoriaContactId.Restauracao);
 
         var query = _db.Ocorrencias.Where(o => o.PropriedadeId == propriedadeId);
 
@@ -71,11 +70,17 @@ internal sealed class JflFonteEventos : IFonteEventos
 
         if (filtro.Severidade == SeveridadeEvento.Critico)
         {
-            query = query.Where(o => o.StatusResolucao == StatusResolucao.Resolvido);
+            query = query.Where(o => o.StatusResolucao == StatusResolucao.Resolvido && criticos.Contains(o.CodigoEvento));
         }
         else if (filtro.Severidade == SeveridadeEvento.Atencao)
         {
-            query = query.Where(o => o.StatusResolucao != StatusResolucao.Resolvido);
+            query = query.Where(o =>
+                !informativos.Contains(o.CodigoEvento)
+                && !(o.StatusResolucao == StatusResolucao.Resolvido && criticos.Contains(o.CodigoEvento)));
+        }
+        else if (filtro.Severidade == SeveridadeEvento.Informativo)
+        {
+            query = query.Where(o => informativos.Contains(o.CodigoEvento));
         }
 
         if (filtro.EquipamentoId is not null)
@@ -128,9 +133,7 @@ internal sealed class JflFonteEventos : IFonteEventos
                 Id = linha.Id,
                 Origem = OrigemEvento.Jfl,
                 Categoria = CategoriaEvento.Alarme,
-                Severidade = linha.StatusResolucao == StatusResolucao.Resolvido
-                    ? SeveridadeEvento.Critico
-                    : SeveridadeEvento.Atencao,
+                Severidade = Gravidade(linha.StatusResolucao, definicao),
                 Titulo = titulo,
                 Descricao = linha.NomeZona,
                 OcorridoEmUtc = linha.CreatedAtUtc,
@@ -138,5 +141,16 @@ internal sealed class JflFonteEventos : IFonteEventos
         }).ToList();
 
         return (itens, total);
+    }
+
+    private static SeveridadeEvento Gravidade(StatusResolucao status, ContactIdDefinition? definicao)
+    {
+        var categoria = definicao?.Categoria ?? CategoriaContactId.Disparo; // codigo fora do catalogo: trata como antes
+        return categoria switch
+        {
+            CategoriaContactId.Restauracao => SeveridadeEvento.Informativo,
+            CategoriaContactId.FalhaEnergia or CategoriaContactId.BateriaBaixa => SeveridadeEvento.Atencao,
+            _ => status == StatusResolucao.Resolvido ? SeveridadeEvento.Critico : SeveridadeEvento.Atencao,
+        };
     }
 }

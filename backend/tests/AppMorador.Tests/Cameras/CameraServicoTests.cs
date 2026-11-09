@@ -1,3 +1,4 @@
+using AppMorador.Application.Rbac;
 using AppMorador.Application.Cameras;
 using AppMorador.Application.Operacional;
 using AppMorador.Domain.Entities;
@@ -38,7 +39,7 @@ public class CameraServicoTests
         var storage = new Mock<ISnapshotStorage>();
         var captura = new Mock<ISnapshotCaptureService>();
         var publicador = new Mock<IOperacionalEventoPublicador>();
-        var servico = new CameraServico(propriedades.Object, cameras.Object, storage.Object, captura.Object, publicador.Object);
+        var servico = new CameraServico(propriedades.Object, cameras.Object, storage.Object, captura.Object, publicador.Object, new AcessoPropriedadeServico());
         return (propriedades, cameras, storage, captura, publicador, servico);
     }
 

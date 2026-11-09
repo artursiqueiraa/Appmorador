@@ -17,5 +17,8 @@ public interface IMoradorRepositorio
 
     Task AddAsync(Morador morador, CancellationToken cancellationToken);
 
+    /// <summary>Sprint 26 — inclui pessoas excluídas (para apagar o rosto delas dos leitores).</summary>
+    Task<Morador?> GetByIdIncluindoExcluidosAsync(Guid id, CancellationToken cancellationToken);
+
     Task SaveChangesAsync(CancellationToken cancellationToken);
 }

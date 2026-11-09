@@ -40,14 +40,24 @@ public sealed class NotificationService : INotificationService
             return;
         }
 
-        var dispositivos = await _dispositivos.ListAtivosByUsuarioAsync(propriedade.ProprietarioId, cancellationToken).ConfigureAwait(false);
-        var elegiveis = dispositivos.Where(d => CanalHabilitado(d, payload.EventoTipo)).ToList();
+        await EnviarParaUsuariosAsync(payload, [propriedade.ProprietarioId], cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task EnviarParaUsuariosAsync(NotificacaoPayload payload, IReadOnlyCollection<Guid> usuarioIds, CancellationToken cancellationToken)
+    {
+        var dispositivos = new List<DispositivoPush>();
+        foreach (var usuarioId in usuarioIds.Distinct())
+        {
+            dispositivos.AddRange(await _dispositivos.ListAtivosByUsuarioAsync(usuarioId, cancellationToken).ConfigureAwait(false));
+        }
+
+        var elegiveis = dispositivos.Where(d => CanalHabilitado(d, payload)).ToList();
 
         if (elegiveis.Count == 0)
         {
             _logger.LogInformation(
-                "Notificacao {Tipo} nao enviada: nenhum dispositivo ativo/elegivel para o usuario {UsuarioId} ({TotalDispositivos} dispositivo(s) ativo(s), canal filtrado)",
-                payload.EventoTipo, propriedade.ProprietarioId, dispositivos.Count);
+                "Notificacao {Tipo} nao enviada: nenhum dispositivo ativo/elegivel para {QuantidadeUsuarios} usuario(s) ({TotalDispositivos} dispositivo(s) ativo(s), canal filtrado)",
+                payload.EventoTipo, usuarioIds.Count, dispositivos.Count);
             return;
         }
 
@@ -83,9 +93,18 @@ public sealed class NotificationService : INotificationService
         }
     }
 
+    /// <summary>
+    /// Sprint 24 (ADR 0040) — notificação crítica (alerta com "Estou ciente") ignora as preferências
+    /// de canal: desligar "alertas" no app nunca pode silenciar um pânico ou uma invasão.
+    /// </summary>
+    private static bool CanalHabilitado(DispositivoPush dispositivo, NotificacaoPayload payload) =>
+        payload.Prioridade == PrioridadeNotificacao.Critica || CanalHabilitado(dispositivo, payload.EventoTipo);
+
     private static bool CanalHabilitado(DispositivoPush dispositivo, EventoNotificacaoTipo tipo) => tipo switch
     {
-        EventoNotificacaoTipo.AlarmeDisparado or EventoNotificacaoTipo.EquipamentoOffline => dispositivo.NotificarAlertas,
+        EventoNotificacaoTipo.AlarmeDisparado or EventoNotificacaoTipo.EquipamentoOffline or EventoNotificacaoTipo.PanicoAcionado
+            or EventoNotificacaoTipo.ViolacaoDetectada or EventoNotificacaoTipo.CentralSemComunicacao or EventoNotificacaoTipo.FalhaEnergia
+            or EventoNotificacaoTipo.BateriaBaixa or EventoNotificacaoTipo.AlertaEscalonado => dispositivo.NotificarAlertas,
         EventoNotificacaoTipo.ComandoAcionado or EventoNotificacaoTipo.VisitanteAutorizado or EventoNotificacaoTipo.EntregaRecebida => dispositivo.NotificarAtividades,
         EventoNotificacaoTipo.SistemaArmado or EventoNotificacaoTipo.SistemaDesarmado => dispositivo.NotificarGeral,
         _ => true,

@@ -1,4 +1,7 @@
 using AppMorador.Api.Auth;
+using AppMorador.Api.Comandos;
+using AppMorador.Application.Comandos;
+using AppMorador.Domain.Entities;
 using AppMorador.Application.Intelbras;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -17,10 +20,12 @@ namespace AppMorador.Api.Controllers;
 public sealed class CentraisIntelbrasController : ControllerBase
 {
     private readonly IIntelbrasComandoServico _intelbrasComandoServico;
+    private readonly IExecucaoComandoServico _execucao;
 
-    public CentraisIntelbrasController(IIntelbrasComandoServico intelbrasComandoServico)
+    public CentraisIntelbrasController(IIntelbrasComandoServico intelbrasComandoServico, IExecucaoComandoServico execucao)
     {
         _intelbrasComandoServico = intelbrasComandoServico;
+        _execucao = execucao;
     }
 
     [HttpGet("api/equipamentos/{id:guid}/intelbras")]
@@ -60,28 +65,20 @@ public sealed class CentraisIntelbrasController : ControllerBase
     }
 
     [HttpPost("api/equipamentos/{id:guid}/intelbras/armar")]
-    public async Task<IActionResult> Armar(Guid id, [FromBody] ParticaoIntelbrasRequest request, CancellationToken cancellationToken)
-    {
-        var result = await _intelbrasComandoServico.ArmarAsync(User.GetUsuarioId(), id, request.Particao, cancellationToken);
-        if (!result.Success)
-        {
-            return NotFound(new { error = result.Error });
-        }
-
-        return Ok(result.Data);
-    }
+    public async Task<IActionResult> Armar(Guid id, [FromBody] ParticaoIntelbrasRequest request, CancellationToken cancellationToken) =>
+        this.ParaResposta(await _execucao.ExecutarAsync(
+            this.Solicitacao(TipoComando.Armar, equipamentoId: id, parametros: $"partição {request.Particao}"),
+            ct => _intelbrasComandoServico.ArmarAsync(User.GetUsuarioId(), id, request.Particao, ct),
+            r => (r.Sucesso, r.MensagemErro),
+            cancellationToken));
 
     [HttpPost("api/equipamentos/{id:guid}/intelbras/desarmar")]
-    public async Task<IActionResult> Desarmar(Guid id, [FromBody] ParticaoIntelbrasRequest request, CancellationToken cancellationToken)
-    {
-        var result = await _intelbrasComandoServico.DesarmarAsync(User.GetUsuarioId(), id, request.Particao, cancellationToken);
-        if (!result.Success)
-        {
-            return NotFound(new { error = result.Error });
-        }
-
-        return Ok(result.Data);
-    }
+    public async Task<IActionResult> Desarmar(Guid id, [FromBody] ParticaoIntelbrasRequest request, CancellationToken cancellationToken) =>
+        this.ParaResposta(await _execucao.ExecutarAsync(
+            this.Solicitacao(TipoComando.Desarmar, equipamentoId: id, parametros: $"partição {request.Particao}"),
+            ct => _intelbrasComandoServico.DesarmarAsync(User.GetUsuarioId(), id, request.Particao, ct),
+            r => (r.Sucesso, r.MensagemErro),
+            cancellationToken));
 
     [HttpPost("api/equipamentos/{id:guid}/intelbras/eventos/importar")]
     public async Task<IActionResult> ImportarEventos(Guid id, CancellationToken cancellationToken)

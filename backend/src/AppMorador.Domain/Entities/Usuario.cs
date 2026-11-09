@@ -37,4 +37,18 @@ public class Usuario
     public bool Ativo { get; set; } = true;
 
     public required DateTime CreatedAtUtc { get; set; }
+
+    /// <summary>Sprint 25 — telefone de contato (só dígitos), editado em "Minha conta".</summary>
+    public string? Telefone { get; set; }
+
+    /// <summary>Sprint 25 — quando a conta foi excluída (anonimizada, LGPD).</summary>
+    public DateTime? ExcluidoEmUtc { get; set; }
+
+    /// <summary>Sprint 27 (ADR 0043) — hash (BCrypt) do PIN que confirma desarmar e abrir. Null = ainda não criou.</summary>
+    public string? PinConfirmacaoHash { get; set; }
+
+    public int TentativasPinFalhas { get; set; }
+
+    /// <summary>Após 5 PINs errados, a confirmação fica bloqueada até este momento.</summary>
+    public DateTime? PinBloqueadoAteUtc { get; set; }
 }

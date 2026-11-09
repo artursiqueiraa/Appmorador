@@ -16,7 +16,8 @@ interface BadgeStatusProps<T extends string> {
 /** Sprint 22B (ADR 0031) — Chip colorido a partir de um mapa enum→cor, reutilizado pelos 3 módulos novos. */
 export function BadgeStatus<T extends string>({ valor, opcoes }: BadgeStatusProps<T>) {
   const opcao = opcoes.find((o) => o.valor === valor);
-  return <Chip size="small" label={opcao?.rotulo ?? valor} color={opcao?.cor ?? 'default'} />;
+  // Akteck Seg (ADR 0035) — contorno em vez de preenchimento: vários selos por linha não competem entre si.
+  return <Chip size="small" variant="outlined" label={opcao?.rotulo ?? valor} color={opcao?.cor ?? 'default'} />;
 }
 
 interface SeletorStatusProps<T extends string> {

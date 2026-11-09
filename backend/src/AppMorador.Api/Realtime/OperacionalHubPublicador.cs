@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using AppMorador.Application.Alertas;
 using AppMorador.Application.Cameras;
 using AppMorador.Application.Eventos;
 using AppMorador.Application.Operacional;
@@ -86,6 +87,20 @@ public sealed class OperacionalHubPublicador : IOperacionalEventoPublicador
             _logger.LogWarning(
                 ex, "Falha ao publicar status de camera em tempo real (propriedade {PropriedadeId}, camera {CameraId})",
                 propriedadeId, evento.CameraId);
+        }
+    }
+
+    public async Task PublicarAlertaCriticoAsync(Guid propriedadeId, AlertaCriticoResponse alerta, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _hub.Clients.Group(OperacionalHub.GrupoPropriedade(propriedadeId))
+                .SendAsync("AlertaCritico", new { propriedadeId, alerta }, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Falha ao publicar alerta critico em tempo real (propriedade {PropriedadeId}, alerta {AlertaId})", propriedadeId, alerta.Id);
         }
     }
 

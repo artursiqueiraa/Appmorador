@@ -7,6 +7,10 @@ namespace AppMorador.Application.Notificacoes;
 /// com qual mensagem". A tabela de mensagens (Fase 4 da missão) é fixa aqui, não
 /// configurável — mudar o texto de uma notificação é uma decisão de produto, não
 /// uma configuração de runtime.
+///
+/// Sprint 24 (ADR 0040) — quando o contexto traz um <see cref="ContextoNotificacao.AlertaId"/>,
+/// a notificação é crítica (canal próprio, abre a tela "Estou ciente") e o debounce passa a ser
+/// por alerta: dois alertas diferentes nunca se suprimem.
 /// </summary>
 public sealed class NotificationDispatcher : INotificationDispatcher
 {
@@ -21,13 +25,21 @@ public sealed class NotificationDispatcher : INotificationDispatcher
         _logger = logger;
     }
 
-    public async Task NotificarAsync(EventoNotificacaoTipo tipo, ContextoNotificacao contexto, CancellationToken cancellationToken)
+    public Task NotificarAsync(EventoNotificacaoTipo tipo, ContextoNotificacao contexto, CancellationToken cancellationToken) =>
+        NotificarInternoAsync(tipo, contexto, usuarioIds: null, cancellationToken);
+
+    public Task NotificarUsuariosAsync(
+        EventoNotificacaoTipo tipo, ContextoNotificacao contexto, IReadOnlyCollection<Guid> usuarioIds, CancellationToken cancellationToken) =>
+        usuarioIds.Count == 0 ? Task.CompletedTask : NotificarInternoAsync(tipo, contexto, usuarioIds, cancellationToken);
+
+    private async Task NotificarInternoAsync(
+        EventoNotificacaoTipo tipo, ContextoNotificacao contexto, IReadOnlyCollection<Guid>? usuarioIds, CancellationToken cancellationToken)
     {
-        // Sprint 19 (Fase 8.2) — debounce por (tipo, equipamento OU propriedade): um
+        // Sprint 19 (Fase 8.2) — debounce por (tipo, alerta OU equipamento OU propriedade): um
         // equipamento oscilando offline/online repetidamente, ou um comando acionado
         // várias vezes seguidas, gera só a primeira notificação por minuto.
-        var chaveDebounce = contexto.EquipamentoId ?? contexto.PropriedadeId;
-        if (!_debounce.PodeNotificar(tipo, chaveDebounce))
+        var chaveDebounce = contexto.AlertaId ?? contexto.EquipamentoId ?? contexto.PropriedadeId;
+        if (!await _debounce.PodeNotificarAsync(tipo, chaveDebounce, cancellationToken).ConfigureAwait(false))
         {
             _logger.LogInformation("Notificacao {Tipo} suprimida por debounce (chave {Chave})", tipo, chaveDebounce);
             return;
@@ -36,12 +48,10 @@ public sealed class NotificationDispatcher : INotificationDispatcher
         var mensagem = MontarMensagem(tipo, contexto);
         if (mensagem is null)
         {
-            // Regra de Ouro: só existe aqui um caminho sem mensagem — EquipamentoOnline
-            // nunca chega a ser chamado (nem está no enum), mas o switch precisa ser
-            // exaustivo; nenhum outro tipo cai neste ramo.
             return;
         }
 
+        var critica = contexto.AlertaId is not null;
         var payload = new NotificacaoPayload
         {
             Titulo = mensagem.Value.Titulo,
@@ -49,20 +59,32 @@ public sealed class NotificationDispatcher : INotificationDispatcher
             EventoTipo = tipo,
             PropriedadeId = contexto.PropriedadeId,
             EquipamentoId = contexto.EquipamentoId,
-            Acao = mensagem.Value.Acao,
-            Prioridade = mensagem.Value.Prioridade,
+            AlertaId = contexto.AlertaId,
+            Acao = critica ? "ABRIR_ALERTA" : mensagem.Value.Acao,
+            Prioridade = critica ? PrioridadeNotificacao.Critica : mensagem.Value.Prioridade,
         };
 
-        await _notificationService.EnviarParaPropriedadeAsync(payload, cancellationToken).ConfigureAwait(false);
-        _debounce.RegistrarEnvio(tipo, chaveDebounce);
+        if (usuarioIds is null)
+        {
+            await _notificationService.EnviarParaPropriedadeAsync(payload, cancellationToken).ConfigureAwait(false);
+        }
+        else
+        {
+            await _notificationService.EnviarParaUsuariosAsync(payload, usuarioIds, cancellationToken).ConfigureAwait(false);
+        }
+
+        await _debounce.RegistrarEnvioAsync(tipo, chaveDebounce, cancellationToken).ConfigureAwait(false);
     }
+
+    private static string Onde(ContextoNotificacao contexto, string padrao) =>
+        contexto.Descricao is null ? padrao : $"{contexto.Descricao} em {contexto.NomePropriedade}";
 
     private static (string Titulo, string Corpo, PrioridadeNotificacao Prioridade, string Acao)? MontarMensagem(EventoNotificacaoTipo tipo, ContextoNotificacao contexto) =>
         tipo switch
         {
             EventoNotificacaoTipo.AlarmeDisparado => (
                 "⚠️ Alarme disparado",
-                $"Uma área protegida foi acionada em {contexto.NomePropriedade}",
+                Onde(contexto, $"Uma área protegida foi acionada em {contexto.NomePropriedade}"),
                 PrioridadeNotificacao.Alta,
                 "ABRIR_APP_HISTORICO"),
 
@@ -104,6 +126,42 @@ public sealed class NotificationDispatcher : INotificationDispatcher
                 $"{contexto.NomeEquipamento ?? "Um dispositivo"} não está respondendo",
                 PrioridadeNotificacao.Alta,
                 "ABRIR_APP_HISTORICO"),
+
+            EventoNotificacaoTipo.PanicoAcionado => (
+                "🆘 Pânico acionado",
+                Onde(contexto, $"Um pedido de socorro foi acionado em {contexto.NomePropriedade}"),
+                PrioridadeNotificacao.Critica,
+                "ABRIR_ALERTA"),
+
+            EventoNotificacaoTipo.ViolacaoDetectada => (
+                "⚠️ Tentativa de violação",
+                Onde(contexto, $"Alguém tentou violar o alarme em {contexto.NomePropriedade}"),
+                PrioridadeNotificacao.Critica,
+                "ABRIR_ALERTA"),
+
+            EventoNotificacaoTipo.CentralSemComunicacao => (
+                "📡 Central sem comunicação",
+                $"A central de alarme de {contexto.NomePropriedade} parou de responder. Verifique o local.",
+                PrioridadeNotificacao.Critica,
+                "ABRIR_ALERTA"),
+
+            EventoNotificacaoTipo.FalhaEnergia => (
+                "🔌 Falta de energia",
+                Onde(contexto, $"A central de {contexto.NomePropriedade} está funcionando pela bateria."),
+                PrioridadeNotificacao.Alta,
+                "ABRIR_APP_HISTORICO"),
+
+            EventoNotificacaoTipo.BateriaBaixa => (
+                "🔋 Bateria fraca",
+                Onde(contexto, $"Uma bateria do alarme está fraca em {contexto.NomePropriedade}") + ". Vale agendar a troca.",
+                PrioridadeNotificacao.Normal,
+                "ABRIR_APP_HISTORICO"),
+
+            EventoNotificacaoTipo.AlertaEscalonado => (
+                "🚨 Alerta sem resposta",
+                $"{contexto.Descricao ?? "Um alerta"} em {contexto.NomePropriedade} ainda não foi confirmado por ninguém.",
+                PrioridadeNotificacao.Critica,
+                "ABRIR_ALERTA"),
 
             _ => null,
         };

@@ -1,3 +1,4 @@
+using AppMorador.Application.Rbac;
 using AppMorador.Application.Common;
 using AppMorador.Domain.Entities;
 using AppMorador.Domain.Repositories;
@@ -11,6 +12,8 @@ namespace AppMorador.Application.Unidades;
 /// </summary>
 public sealed class UnidadeServico : IUnidadeServico
 {
+    private readonly IAcessoPropriedadeServico _acesso;
+
     private readonly IPropriedadeRepositorio _propriedades;
     private readonly IUnidadeRepositorio _unidades;
     private readonly IMoradorRepositorio _moradores;
@@ -32,8 +35,10 @@ public sealed class UnidadeServico : IUnidadeServico
         IVeiculoRepositorio veiculos,
         IVinculoVeiculoVagaRepositorio vinculosVeiculoVaga,
         IPermissaoVeicularRepositorio permissoesVeiculares,
-        IEntregaRepositorio entregas)
+        IEntregaRepositorio entregas,
+        IAcessoPropriedadeServico acesso)
     {
+        _acesso = acesso;
         _propriedades = propriedades;
         _unidades = unidades;
         _moradores = moradores;
@@ -50,7 +55,7 @@ public sealed class UnidadeServico : IUnidadeServico
         Guid proprietarioId, Guid propriedadeId, CriarUnidadeRequest request, CancellationToken cancellationToken)
     {
         var propriedade = await _propriedades.GetByIdAsync(propriedadeId, cancellationToken).ConfigureAwait(false);
-        if (propriedade is null || propriedade.ProprietarioId != proprietarioId)
+        if (propriedade is null || !_acesso.Pode(proprietarioId, propriedade, NivelAcesso.Alterar))
         {
             return Result<UnidadeResponse>.Fail("Propriedade não encontrada.");
         }
@@ -74,7 +79,7 @@ public sealed class UnidadeServico : IUnidadeServico
         Guid proprietarioId, Guid propriedadeId, CancellationToken cancellationToken)
     {
         var propriedade = await _propriedades.GetByIdAsync(propriedadeId, cancellationToken).ConfigureAwait(false);
-        if (propriedade is null || propriedade.ProprietarioId != proprietarioId)
+        if (propriedade is null || !_acesso.Pode(proprietarioId, propriedade, NivelAcesso.Ver))
         {
             return Result<IReadOnlyList<UnidadeResponse>>.Fail("Propriedade não encontrada.");
         }
@@ -91,7 +96,7 @@ public sealed class UnidadeServico : IUnidadeServico
         // Mesma mensagem para "nao existe" e "existe mas nao e do usuario" (padrao ja
         // usado em PropriedadeServico) — nao revela para o cliente que uma unidade de
         // outro dono existe com este Id.
-        if (unidade is null || unidade.Propriedade is null || unidade.Propriedade.ProprietarioId != proprietarioId)
+        if (unidade is null || unidade.Propriedade is null || !_acesso.Pode(proprietarioId, unidade.Propriedade, NivelAcesso.Alterar))
         {
             return Result<UnidadeResponse>.Fail("Unidade não encontrada.");
         }
@@ -106,7 +111,7 @@ public sealed class UnidadeServico : IUnidadeServico
     public async Task<Result> DeleteAsync(Guid proprietarioId, Guid unidadeId, CancellationToken cancellationToken)
     {
         var unidade = await _unidades.GetByIdAsync(unidadeId, cancellationToken).ConfigureAwait(false);
-        if (unidade is null || unidade.Propriedade is null || unidade.Propriedade.ProprietarioId != proprietarioId)
+        if (unidade is null || unidade.Propriedade is null || !_acesso.Pode(proprietarioId, unidade.Propriedade, NivelAcesso.Alterar))
         {
             return Result.Fail("Unidade não encontrada.");
         }

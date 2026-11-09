@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using AppMorador.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
@@ -90,6 +91,32 @@ public class AppDbContext : DbContext
 
     // Sprint 22B (ADR 0031)
     public DbSet<VinculoEquipamentoPropriedade> VinculosEquipamentoPropriedade => Set<VinculoEquipamentoPropriedade>();
+
+    // Sprint 24 (ADR 0040) — alertas confiáveis.
+    public DbSet<AlertaCritico> AlertasCriticos => Set<AlertaCritico>();
+
+    public DbSet<ContatoEmergencia> ContatosEmergencia => Set<ContatoEmergencia>();
+
+    public DbSet<EventoConectividade> EventosConectividade => Set<EventoConectividade>();
+
+    public DbSet<ControleEnvioNotificacao> ControlesEnvioNotificacao => Set<ControleEnvioNotificacao>();
+
+    // Sprint 24.5 — portões e portas.
+    public DbSet<AberturaPontoAcesso> AberturasPontoAcesso => Set<AberturaPontoAcesso>();
+
+    // Sprint 25 — contas e multiusuário.
+    public DbSet<ConvitePropriedade> ConvitesPropriedade => Set<ConvitePropriedade>();
+
+    // Sprint 26 — facial ponta a ponta + LGPD.
+    public DbSet<ConsentimentoBiometrico> ConsentimentosBiometricos => Set<ConsentimentoBiometrico>();
+
+    public DbSet<SincronizacaoFoto> SincronizacoesFoto => Set<SincronizacaoFoto>();
+
+    /// <summary>Sprint 27 (ADR 0043) — auditoria de comandos.</summary>
+    public DbSet<ComandoExecutado> ComandosExecutados => Set<ComandoExecutado>();
+
+    /// <summary>Sprint 27 (ADR 0043) — resultado dos backups agendados e testes de restauração.</summary>
+    public DbSet<RegistroBackup> RegistrosBackup => Set<RegistroBackup>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -210,6 +237,19 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<Morador>()
             .Property(m => m.Status)
             .HasConversion<string>();
+
+        // Akteck Seg (ADR 0036) — titular/dependente. Default "Titular" no banco faz o
+        // backfill de todos os moradores já existentes na própria migration.
+        modelBuilder.Entity<Morador>()
+            .Property(m => m.Tipo)
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .HasDefaultValue(TipoMorador.Titular);
+
+        modelBuilder.Entity<Morador>()
+            .Property(m => m.Parentesco)
+            .HasConversion<string>()
+            .HasMaxLength(20);
 
         // Query filter global: nenhuma consulta normal ve registro excluido
         // logicamente — quem implementa uma consulta nova sobre estas 3 entidades nao
@@ -700,5 +740,182 @@ public class AppDbContext : DbContext
 
         modelBuilder.Entity<AuditoriaMaster>()
             .HasIndex(a => a.UsuarioId);
+
+        ConfigurarAlertasConfiaveis(modelBuilder);
+        ConfigurarPortoesEPortas(modelBuilder);
+        ConfigurarMultiusuario(modelBuilder);
+        ConfigurarFacial(modelBuilder);
+        ConfigurarSegurancaConta(modelBuilder);
+        MarcarDatasUtc(modelBuilder);
+    }
+
+    /// <summary>
+    /// Sprint 24.5 — ponto de acesso ligado ao que abre (equipamento + saída) e à câmera que mostra
+    /// a porta. Equipamento tem soft delete (Restrict físico, como o resto do domínio); câmera
+    /// excluída só desliga o vínculo.
+    /// </summary>
+    private static void ConfigurarPortoesEPortas(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<PontoAcesso>(e =>
+        {
+            e.HasOne(p => p.EquipamentoAcionador).WithMany().HasForeignKey(p => p.EquipamentoAcionadorId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(p => p.Camera).WithMany().HasForeignKey(p => p.CameraId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<AberturaPontoAcesso>(e =>
+        {
+            e.HasOne(a => a.PontoAcesso).WithMany().HasForeignKey(a => a.PontoAcessoId).OnDelete(DeleteBehavior.Restrict);
+            e.Property(a => a.Mensagem).HasMaxLength(200);
+            e.HasIndex(a => new { a.PontoAcessoId, a.OcorridoEmUtc });
+        });
+    }
+
+    /// <summary>Sprint 25 (ADR 0041) — convites de acesso; código guardado só como hash (único).</summary>
+    private static void ConfigurarMultiusuario(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ConvitePropriedade>(e =>
+        {
+            e.HasOne(c => c.Propriedade).WithMany().HasForeignKey(c => c.PropriedadeId).OnDelete(DeleteBehavior.Restrict);
+            e.Property(c => c.Papel).HasConversion<string>().HasMaxLength(20);
+            e.Property(c => c.Email).HasMaxLength(200);
+            e.Property(c => c.CodigoHash).HasMaxLength(64);
+            e.HasIndex(c => c.CodigoHash).IsUnique();
+            e.HasIndex(c => c.PropriedadeId);
+        });
+
+        modelBuilder.Entity<Usuario>().Property(u => u.Telefone).HasMaxLength(20);
+    }
+
+    /// <summary>Sprint 27 (ADR 0043) — auditoria de comandos (chave de idempotência única por usuário) e backups.</summary>
+    private static void ConfigurarSegurancaConta(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ComandoExecutado>(e =>
+        {
+            e.Property(c => c.Tipo).HasConversion<string>().HasMaxLength(20);
+            e.Property(c => c.Confirmacao).HasConversion<string>().HasMaxLength(20);
+            e.Property(c => c.Parametros).HasMaxLength(100);
+            e.Property(c => c.Mensagem).HasMaxLength(200);
+            e.Property(c => c.ChaveIdempotencia).HasMaxLength(64);
+            e.Property(c => c.RespostaJson).HasColumnType("longtext");
+            e.HasIndex(c => new { c.PropriedadeId, c.OcorridoEmUtc });
+            // MySQL aceita várias linhas com NULL num índice único: só comandos com chave competem.
+            e.HasIndex(c => new { c.UsuarioId, c.ChaveIdempotencia }).IsUnique();
+        });
+
+        modelBuilder.Entity<RegistroBackup>(e =>
+        {
+            e.Property(r => r.Tipo).HasConversion<string>().HasMaxLength(20);
+            e.Property(r => r.Arquivo).HasMaxLength(300);
+            e.Property(r => r.Mensagem).HasMaxLength(500);
+            e.HasIndex(r => new { r.Tipo, r.OcorridoEmUtc });
+        });
+
+        modelBuilder.Entity<Usuario>().Property(u => u.PinConfirmacaoHash).HasMaxLength(100);
+    }
+
+    /// <summary>Sprint 26 (ADR 0042) — consentimento biométrico e situação da foto em cada leitor.</summary>
+    private static void ConfigurarFacial(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ConsentimentoBiometrico>(e =>
+        {
+            e.HasOne(c => c.Morador).WithMany().HasForeignKey(c => c.MoradorId).OnDelete(DeleteBehavior.Restrict);
+            e.Property(c => c.VersaoTermo).HasMaxLength(20);
+            e.HasIndex(c => new { c.MoradorId, c.RevogadoEmUtc });
+        });
+
+        modelBuilder.Entity<SincronizacaoFoto>(e =>
+        {
+            e.HasOne(s => s.Equipamento).WithMany().HasForeignKey(s => s.EquipamentoId).OnDelete(DeleteBehavior.Restrict);
+            e.Property(s => s.Situacao).HasConversion<string>().HasMaxLength(20);
+            e.Property(s => s.Operacao).HasMaxLength(20);
+            e.Property(s => s.Mensagem).HasMaxLength(200);
+            e.HasIndex(s => new { s.MoradorId, s.EquipamentoId }).IsUnique();
+            e.HasIndex(s => s.Situacao);
+        });
+    }
+
+    private static readonly ValueConverter<DateTime, DateTime> ConversorUtc =
+        new(v => v, v => DateTime.SpecifyKind(v, DateTimeKind.Utc));
+
+    private static readonly ValueConverter<DateTime?, DateTime?> ConversorUtcOpcional =
+        new(v => v, v => v.HasValue ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v);
+
+    /// <summary>
+    /// Sprint 24 (achado na homologação) — o MySQL devolve DateTime sem fuso (Kind = Unspecified), e a
+    /// API serializava "2026-11-08T19:01:06" sem o "Z": o celular no Brasil lia como hora local e
+    /// mostrava tudo 3 horas adiantado ("agora mesmo" por 3 horas, alerta "às 19:00" às 16:00). Toda
+    /// propriedade cujo nome termina em "Utc" (convenção do projeto) — e o Timestamp do registro de
+    /// alarme — volta do banco marcada como UTC e sai na API com "Z". Datas de calendário digitadas
+    /// pelo usuário (ex.: DataInicial/DataFinal de autorizações) ficam de fora de propósito.
+    /// </summary>
+    private static void MarcarDatasUtc(ModelBuilder modelBuilder)
+    {
+        foreach (var entidade in modelBuilder.Model.GetEntityTypes())
+        {
+            foreach (var propriedade in entidade.GetProperties())
+            {
+                var ehUtc = propriedade.Name.EndsWith("Utc", StringComparison.Ordinal)
+                    || (entidade.ClrType == typeof(RegistroEventoAlarme) && propriedade.Name == nameof(RegistroEventoAlarme.Timestamp));
+                if (!ehUtc || propriedade.GetValueConverter() is not null)
+                {
+                    continue;
+                }
+
+                if (propriedade.ClrType == typeof(DateTime))
+                {
+                    propriedade.SetValueConverter(ConversorUtc);
+                }
+                else if (propriedade.ClrType == typeof(DateTime?))
+                {
+                    propriedade.SetValueConverter(ConversorUtcOpcional);
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Sprint 24 (ADR 0040). AlertaCritico e EventoConectividade são registro de segurança (sem soft
+    /// delete, nunca apagados); OcorrenciaId/EquipamentoId do alerta são referência solta, sem FK —
+    /// mesmo espírito de Ocorrencia, o alerta precisa existir mesmo que a origem suma.
+    /// </summary>
+    private static void ConfigurarAlertasConfiaveis(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Propriedade>()
+            .Property(p => p.MinutosEscalonamento)
+            .HasDefaultValue(2);
+
+        modelBuilder.Entity<AlertaCritico>(e =>
+        {
+            e.HasOne(a => a.Propriedade).WithMany().HasForeignKey(a => a.PropriedadeId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(a => a.ConfirmadoPorUsuario).WithMany().HasForeignKey(a => a.ConfirmadoPorUsuarioId).OnDelete(DeleteBehavior.Restrict);
+            e.Property(a => a.Tipo).HasConversion<string>().HasMaxLength(20);
+            e.Property(a => a.NivelEscalonamento).HasConversion<string>().HasMaxLength(20);
+            e.Property(a => a.Descricao).HasMaxLength(200);
+            e.HasIndex(a => new { a.PropriedadeId, a.CriadoEmUtc });
+            e.HasIndex(a => a.ProximoEscalonamentoEmUtc);
+        });
+
+        modelBuilder.Entity<ContatoEmergencia>(e =>
+        {
+            e.HasOne(c => c.Propriedade).WithMany().HasForeignKey(c => c.PropriedadeId).OnDelete(DeleteBehavior.Restrict);
+            e.Property(c => c.Nome).HasMaxLength(80);
+            e.Property(c => c.Telefone).HasMaxLength(20);
+            e.HasIndex(c => new { c.PropriedadeId, c.Ordem });
+            e.HasQueryFilter(c => !c.Excluido);
+        });
+
+        modelBuilder.Entity<EventoConectividade>(e =>
+        {
+            e.HasOne(c => c.Equipamento).WithMany().HasForeignKey(c => c.EquipamentoId).OnDelete(DeleteBehavior.Restrict);
+            e.Property(c => c.Tipo).HasConversion<string>().HasMaxLength(20);
+            e.HasIndex(c => new { c.PropriedadeId, c.OcorridoEmUtc });
+            e.HasIndex(c => new { c.EquipamentoId, c.OcorridoEmUtc });
+        });
+
+        modelBuilder.Entity<ControleEnvioNotificacao>(e =>
+        {
+            e.HasKey(c => c.Chave);
+            e.Property(c => c.Chave).HasMaxLength(80);
+        });
     }
 }

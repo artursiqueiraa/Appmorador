@@ -1,3 +1,4 @@
+using AppMorador.Application.Alertas;
 using AppMorador.Application.Cameras;
 using AppMorador.Application.Eventos;
 
@@ -27,4 +28,7 @@ public interface IOperacionalEventoPublicador
 
     /// <summary>Sprint 20 — evento leve, separado do Snapshot Operacional (ver <see cref="CameraStatusEvento"/>): câmera é exibição, não faz parte do cálculo de saúde operacional.</summary>
     Task PublicarCameraStatusAsync(Guid propriedadeId, CameraStatusEvento evento, CancellationToken cancellationToken);
+
+    /// <summary>Sprint 24 (ADR 0040) — alerta crítico aberto ou alterado (confirmado/escalonado): o app abre ou fecha a tela de alerta.</summary>
+    Task PublicarAlertaCriticoAsync(Guid propriedadeId, AlertaCriticoResponse alerta, CancellationToken cancellationToken);
 }

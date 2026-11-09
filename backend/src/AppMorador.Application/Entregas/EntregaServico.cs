@@ -1,3 +1,4 @@
+using AppMorador.Application.Rbac;
 using AppMorador.Application.Common;
 using AppMorador.Application.Notificacoes;
 using AppMorador.Domain.Entities;
@@ -15,6 +16,8 @@ namespace AppMorador.Application.Entregas;
 /// </summary>
 public sealed class EntregaServico : IEntregaServico
 {
+    private readonly IAcessoPropriedadeServico _acesso;
+
     private readonly IPropriedadeRepositorio _propriedades;
     private readonly IUnidadeRepositorio _unidades;
     private readonly IMoradorRepositorio _moradores;
@@ -28,8 +31,10 @@ public sealed class EntregaServico : IEntregaServico
         IMoradorRepositorio moradores,
         IEntregaRepositorio entregas,
         IHistoricoEntregaRepositorio historico,
-        INotificationDispatcher notificationDispatcher)
+        INotificationDispatcher notificationDispatcher,
+        IAcessoPropriedadeServico acesso)
     {
+        _acesso = acesso;
         _propriedades = propriedades;
         _unidades = unidades;
         _moradores = moradores;
@@ -42,7 +47,7 @@ public sealed class EntregaServico : IEntregaServico
         Guid proprietarioId, Guid propriedadeId, CriarEntregaRequest request, CancellationToken cancellationToken)
     {
         var propriedade = await _propriedades.GetByIdAsync(propriedadeId, cancellationToken).ConfigureAwait(false);
-        if (propriedade is null || propriedade.ProprietarioId != proprietarioId)
+        if (propriedade is null || !_acesso.Pode(proprietarioId, propriedade, NivelAcesso.Alterar))
         {
             return Result<EntregaResponse>.Fail("Propriedade não encontrada.");
         }
@@ -87,7 +92,7 @@ public sealed class EntregaServico : IEntregaServico
         Guid proprietarioId, Guid propriedadeId, CancellationToken cancellationToken)
     {
         var propriedade = await _propriedades.GetByIdAsync(propriedadeId, cancellationToken).ConfigureAwait(false);
-        if (propriedade is null || propriedade.ProprietarioId != proprietarioId)
+        if (propriedade is null || !_acesso.Pode(proprietarioId, propriedade, NivelAcesso.Ver))
         {
             return Result<IReadOnlyList<EntregaResponse>>.Fail("Propriedade não encontrada.");
         }
@@ -100,7 +105,7 @@ public sealed class EntregaServico : IEntregaServico
     public async Task<Result<EntregaResponse>> GetByIdAsync(Guid proprietarioId, Guid entregaId, CancellationToken cancellationToken)
     {
         var entrega = await _entregas.GetByIdAsync(entregaId, cancellationToken).ConfigureAwait(false);
-        if (!PertenceAoProprietario(entrega, proprietarioId))
+        if (!PertenceAoProprietario(entrega, proprietarioId, NivelAcesso.Ver))
         {
             return Result<EntregaResponse>.Fail("Entrega não encontrada.");
         }
@@ -225,8 +230,8 @@ public sealed class EntregaServico : IEntregaServico
             new HistoricoEntrega { Id = Guid.NewGuid(), EntregaId = entregaId, TipoEvento = tipoEvento, Descricao = descricao, UsuarioId = usuarioId, CreatedAtUtc = DateTime.UtcNow },
             cancellationToken).ConfigureAwait(false);
 
-    private static bool PertenceAoProprietario(Entrega? entrega, Guid proprietarioId) =>
-        entrega?.MoradorDestinatario?.Unidade?.Propriedade is not null && entrega.MoradorDestinatario.Unidade.Propriedade.ProprietarioId == proprietarioId;
+    private bool PertenceAoProprietario(Entrega? entrega, Guid proprietarioId, NivelAcesso nivel = NivelAcesso.Alterar) =>
+        entrega?.MoradorDestinatario?.Unidade?.Propriedade is not null && _acesso.Pode(proprietarioId, entrega.MoradorDestinatario.Unidade.Propriedade, nivel);
 
     private static string? NullIfBlank(string? valor) => string.IsNullOrWhiteSpace(valor) ? null : valor.Trim();
 

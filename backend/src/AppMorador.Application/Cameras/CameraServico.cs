@@ -1,3 +1,4 @@
+using AppMorador.Application.Rbac;
 using AppMorador.Application.Common;
 using AppMorador.Application.Operacional;
 using AppMorador.Domain.Entities;
@@ -14,6 +15,8 @@ namespace AppMorador.Application.Cameras;
 /// </summary>
 public sealed class CameraServico : ICameraServico
 {
+    private readonly IAcessoPropriedadeServico _acesso;
+
     // Sprint 20 (Fase 2.3 da missão) — limite superior do tempo que o morador espera
     // pelo botão "Atualizar imagem". Camada extra sobre o timeout já configurado em
     // Snapshots:TimeoutSeconds (que protege cada chamada HTTP ao gravador
@@ -32,8 +35,10 @@ public sealed class CameraServico : ICameraServico
         ICameraRepositorio cameras,
         ISnapshotStorage storage,
         ISnapshotCaptureService snapshotCaptureService,
-        IOperacionalEventoPublicador publicador)
+        IOperacionalEventoPublicador publicador,
+        IAcessoPropriedadeServico acesso)
     {
+        _acesso = acesso;
         _propriedades = propriedades;
         _cameras = cameras;
         _storage = storage;
@@ -45,7 +50,7 @@ public sealed class CameraServico : ICameraServico
         Guid proprietarioId, Guid propriedadeId, CancellationToken cancellationToken)
     {
         var propriedade = await _propriedades.GetByIdAsync(propriedadeId, cancellationToken).ConfigureAwait(false);
-        if (propriedade is null || propriedade.ProprietarioId != proprietarioId)
+        if (propriedade is null || !_acesso.Pode(proprietarioId, propriedade, NivelAcesso.Ver))
         {
             return Result<IReadOnlyList<CameraResponse>>.Fail("Propriedade não encontrada.");
         }
@@ -191,7 +196,7 @@ public sealed class CameraServico : ICameraServico
     private async Task<Camera?> ResolverCameraAsync(Guid proprietarioId, Guid cameraId, CancellationToken cancellationToken)
     {
         var camera = await _cameras.GetByIdAsync(cameraId, cancellationToken).ConfigureAwait(false);
-        return camera?.Propriedade is null || camera.Propriedade.ProprietarioId != proprietarioId ? null : camera;
+        return camera?.Propriedade is null || !_acesso.Pode(proprietarioId, camera.Propriedade, NivelAcesso.Ver) ? null : camera;
     }
 
     /// <summary>Sprint 20 — cache-busting via querystring (ticks do último sucesso): sem isso, o cache de imagem do mobile (expo-image) nunca invalidaria depois de uma nova captura, porque a URL nunca mudaria.</summary>

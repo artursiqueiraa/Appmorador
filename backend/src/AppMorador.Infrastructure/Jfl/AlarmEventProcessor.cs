@@ -1,3 +1,4 @@
+using AppMorador.Application.Alertas;
 using AppMorador.Application.Notificacoes;
 using AppMorador.Application.Operacional;
 using AppMorador.Domain.ContactId;
@@ -34,6 +35,7 @@ public sealed class AlarmEventProcessor
     private readonly ISnapshotOperacionalServico _snapshotOperacional;
     private readonly IOperacionalEventoPublicador _publicador;
     private readonly INotificationDispatcher _notificationDispatcher;
+    private readonly IAlertaCriticoServico _alertasCriticos;
     private readonly ILogger<AlarmEventProcessor> _logger;
 
     public AlarmEventProcessor(
@@ -42,6 +44,7 @@ public sealed class AlarmEventProcessor
         ISnapshotOperacionalServico snapshotOperacional,
         IOperacionalEventoPublicador publicador,
         INotificationDispatcher notificationDispatcher,
+        IAlertaCriticoServico alertasCriticos,
         ILogger<AlarmEventProcessor> logger)
     {
         _db = db;
@@ -49,6 +52,7 @@ public sealed class AlarmEventProcessor
         _snapshotOperacional = snapshotOperacional;
         _publicador = publicador;
         _notificationDispatcher = notificationDispatcher;
+        _alertasCriticos = alertasCriticos;
         _logger = logger;
     }
 
@@ -73,7 +77,7 @@ public sealed class AlarmEventProcessor
             }
             else if (definicao!.GeneratesOccurrence)
             {
-                await CriarOcorrenciaAsync(numeroSerie, evento, recebidoEmUtc, cancellationToken)
+                await CriarOcorrenciaAsync(numeroSerie, evento, definicao, recebidoEmUtc, cancellationToken)
                     .ConfigureAwait(false);
                 resultado = ResultadoProcessamentoEvento.OcorrenciaCriada;
             }
@@ -100,7 +104,7 @@ public sealed class AlarmEventProcessor
     }
 
     private async Task CriarOcorrenciaAsync(
-        string? numeroSerie, EventoRequest evento, DateTime recebidoEmUtc, CancellationToken cancellationToken)
+        string? numeroSerie, EventoRequest evento, ContactIdDefinition definicao, DateTime recebidoEmUtc, CancellationToken cancellationToken)
     {
         Central? central = null;
         Zona? zona = null;
@@ -117,15 +121,17 @@ public sealed class AlarmEventProcessor
                     "Central {NumeroSerie} nao cadastrada — Ocorrencia sera criada como NaoResolvido (dado bruto do evento preservado)",
                     numeroSerie);
             }
-            else
+            else if (definicao.UsaZona)
             {
+                // Sprint 24 — so eventos de sensor trazem numero de zona; panico/energia/bateria da
+                // central trazem usuario ou nada, e nao podem ser confundidos com uma zona.
                 zona = await _db.Zonas
                     .FirstOrDefaultAsync(z => z.CentralId == central.Id && z.Numero == evento.UsuarioOuZona, cancellationToken)
                     .ConfigureAwait(false);
             }
         }
 
-        var resolvido = central is not null && zona is not null;
+        var resolvido = central is not null && (zona is not null || !definicao.UsaZona);
 
         var ocorrencia = new Ocorrencia
         {
@@ -160,14 +166,25 @@ public sealed class AlarmEventProcessor
         // Central cadastrada nao ha grupo para notificar).
         if (ocorrencia.PropriedadeId is not null)
         {
-            await PublicarAtualizacaoOperacionalAsync(ocorrencia, cancellationToken).ConfigureAwait(false);
+            await PublicarAtualizacaoOperacionalAsync(ocorrencia, definicao, zona?.Nome, cancellationToken).ConfigureAwait(false);
+
+            // Sprint 24 — separado do tempo real: uma falha no SignalR nunca pode impedir o
+            // alerta crítico (que tem push, escalonamento e SMS próprios).
+            try
+            {
+                await NotificarPorCategoriaAsync(ocorrencia, definicao, zona?.Nome, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Falha ao abrir alerta/notificar apos Ocorrencia {OcorrenciaId}", ocorrencia.Id);
+            }
         }
 
         // So faz sentido tentar o snapshot quando central e zona foram resolvidos —
         // sem ZonaId nao ha como achar o VinculoZonaCamera, e sem PropriedadeId nao ha
         // onde salvar o arquivo. Ocorrencia.ImagePath fica null nesse caso, sem
         // bloquear nada (mesma regra de nao travar a ocorrencia por causa do DVR).
-        if (ocorrencia.StatusResolucao == StatusResolucao.Resolvido)
+        if (ocorrencia.StatusResolucao == StatusResolucao.Resolvido && ocorrencia.ZonaId is not null)
         {
             try
             {
@@ -202,7 +219,8 @@ public sealed class AlarmEventProcessor
         }
     }
 
-    private async Task PublicarAtualizacaoOperacionalAsync(Ocorrencia ocorrencia, CancellationToken cancellationToken)
+    private async Task PublicarAtualizacaoOperacionalAsync(
+        Ocorrencia ocorrencia, ContactIdDefinition definicao, string? nomeZona, CancellationToken cancellationToken)
     {
         var propriedadeId = ocorrencia.PropriedadeId!.Value;
 
@@ -212,17 +230,15 @@ public sealed class AlarmEventProcessor
             // catálogo Contact ID, Destaque quando resolvido) — não é uma regra nova,
             // apenas reaplicada aqui no momento da criação do evento, para a notificação
             // em tempo real (a Central de Eventos via GET continua a fonte de verdade).
-            var titulo = ContactIdCatalog.TryGet(ocorrencia.CodigoEvento, out var definicao)
-                ? definicao!.FriendlyMessage
-                : "Evento registrado";
+            var titulo = definicao.FriendlyMessage;
 
             var eventoResponse = new AppMorador.Application.Eventos.EventoResponse
             {
                 Id = ocorrencia.Id,
                 Titulo = titulo,
-                Descricao = null,
+                Descricao = nomeZona,
                 OcorridoEmUtc = ocorrencia.CreatedAtUtc,
-                Destaque = ocorrencia.StatusResolucao == StatusResolucao.Resolvido,
+                Destaque = ContactIdCatalog.EhCritica(definicao.Categoria) && ocorrencia.StatusResolucao == StatusResolucao.Resolvido,
             };
 
             await _publicador.PublicarNovoEventoAsync(propriedadeId, eventoResponse, cancellationToken).ConfigureAwait(false);
@@ -230,20 +246,6 @@ public sealed class AlarmEventProcessor
                 .RegenerarEPublicarAsync(propriedadeId, MotivoAtualizacaoOperacional.AlarmeDisparado, cancellationToken)
                 .ConfigureAwait(false);
 
-            // Sprint 19 (ADR 0023) — complemento ao SignalR acima: alarme disparado é
-            // "sempre notificar" (Fase 4 da missão), independente de o app estar aberto.
-            var propriedade = await _db.Propriedades
-                .FirstOrDefaultAsync(p => p.Id == propriedadeId, cancellationToken)
-                .ConfigureAwait(false);
-
-            await _notificationDispatcher.NotificarAsync(
-                EventoNotificacaoTipo.AlarmeDisparado,
-                new ContextoNotificacao
-                {
-                    PropriedadeId = propriedadeId,
-                    NomePropriedade = propriedade?.Nome ?? "sua propriedade",
-                },
-                cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -252,6 +254,63 @@ public sealed class AlarmEventProcessor
             // o processamento do evento de alarme como erro.
             _logger.LogWarning(ex, "Falha ao publicar atualizacao operacional em tempo real apos Ocorrencia {OcorrenciaId}", ocorrencia.Id);
         }
+    }
+
+    /// <summary>
+    /// Sprint 24 (ADR 0040) — destino de cada categoria do catálogo:
+    /// disparo/pânico/violação → alerta crítico ("Estou ciente" + escalonamento);
+    /// falta de energia e bateria baixa → notificação comum; restauração → só histórico.
+    /// </summary>
+    private async Task NotificarPorCategoriaAsync(
+        Ocorrencia ocorrencia, ContactIdDefinition definicao, string? nomeZona, CancellationToken cancellationToken)
+    {
+        var propriedadeId = ocorrencia.PropriedadeId!.Value;
+        var descricao = nomeZona is null ? definicao.FriendlyMessage : $"{definicao.FriendlyMessage} — {nomeZona}";
+
+        if (ContactIdCatalog.EhCritica(definicao.Categoria))
+        {
+            await _alertasCriticos.CriarAsync(
+                new NovoAlertaCritico
+                {
+                    PropriedadeId = propriedadeId,
+                    Tipo = definicao.Categoria switch
+                    {
+                        CategoriaContactId.Panico => TipoAlertaCritico.Panico,
+                        CategoriaContactId.Violacao => TipoAlertaCritico.Violacao,
+                        _ => TipoAlertaCritico.Disparo,
+                    },
+                    Descricao = descricao,
+                    OcorrenciaId = ocorrencia.Id,
+                },
+                cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        EventoNotificacaoTipo? tipo = definicao.Categoria switch
+        {
+            CategoriaContactId.FalhaEnergia => EventoNotificacaoTipo.FalhaEnergia,
+            CategoriaContactId.BateriaBaixa => EventoNotificacaoTipo.BateriaBaixa,
+            _ => null,
+        };
+
+        if (tipo is null)
+        {
+            return;
+        }
+
+        var propriedade = await _db.Propriedades
+            .FirstOrDefaultAsync(p => p.Id == propriedadeId, cancellationToken)
+            .ConfigureAwait(false);
+
+        await _notificationDispatcher.NotificarAsync(
+            tipo.Value,
+            new ContextoNotificacao
+            {
+                PropriedadeId = propriedadeId,
+                NomePropriedade = propriedade?.Nome ?? "sua propriedade",
+                Descricao = descricao,
+            },
+            cancellationToken).ConfigureAwait(false);
     }
 
     private async Task GravarLogAsync(

@@ -8,3 +8,10 @@ export type FabricanteEquipamento = 'ControlId' | 'Jfl' | 'Intelbras';
 export type StatusEquipamento = 'Desconhecido' | 'Online' | 'Offline';
 
 export type EstadoOperacionalEquipamento = 'Ativo' | 'EmManutencao' | 'Inativo' | 'Defeituoso';
+
+/** Akteck Seg (ADR 0035) — nome comercial do fabricante (nunca o valor do enum, "ControlId"/"Jfl"). */
+export const ROTULO_FABRICANTE: Record<FabricanteEquipamento, string> = {
+  ControlId: 'Control iD',
+  Jfl: 'JFL',
+  Intelbras: 'Intelbras',
+};

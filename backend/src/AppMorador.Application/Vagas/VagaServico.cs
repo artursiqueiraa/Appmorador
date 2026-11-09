@@ -1,3 +1,4 @@
+using AppMorador.Application.Rbac;
 using AppMorador.Application.Common;
 using AppMorador.Domain.Entities;
 using AppMorador.Domain.Repositories;
@@ -13,6 +14,8 @@ namespace AppMorador.Application.Vagas;
 /// </summary>
 public sealed class VagaServico : IVagaServico
 {
+    private readonly IAcessoPropriedadeServico _acesso;
+
     private readonly IPropriedadeRepositorio _propriedades;
     private readonly IVagaRepositorio _vagas;
     private readonly IVinculoVeiculoVagaRepositorio _vinculos;
@@ -22,8 +25,10 @@ public sealed class VagaServico : IVagaServico
         IPropriedadeRepositorio propriedades,
         IVagaRepositorio vagas,
         IVinculoVeiculoVagaRepositorio vinculos,
-        IHistoricoVagaRepositorio historico)
+        IHistoricoVagaRepositorio historico,
+        IAcessoPropriedadeServico acesso)
     {
+        _acesso = acesso;
         _propriedades = propriedades;
         _vagas = vagas;
         _vinculos = vinculos;
@@ -34,7 +39,7 @@ public sealed class VagaServico : IVagaServico
         Guid proprietarioId, Guid propriedadeId, CriarVagaRequest request, CancellationToken cancellationToken)
     {
         var propriedade = await _propriedades.GetByIdAsync(propriedadeId, cancellationToken).ConfigureAwait(false);
-        if (propriedade is null || propriedade.ProprietarioId != proprietarioId)
+        if (propriedade is null || !_acesso.Pode(proprietarioId, propriedade, NivelAcesso.Alterar))
         {
             return Result<VagaResponse>.Fail("Propriedade não encontrada.");
         }
@@ -65,7 +70,7 @@ public sealed class VagaServico : IVagaServico
         Guid proprietarioId, Guid propriedadeId, CancellationToken cancellationToken)
     {
         var propriedade = await _propriedades.GetByIdAsync(propriedadeId, cancellationToken).ConfigureAwait(false);
-        if (propriedade is null || propriedade.ProprietarioId != proprietarioId)
+        if (propriedade is null || !_acesso.Pode(proprietarioId, propriedade, NivelAcesso.Ver))
         {
             return Result<IReadOnlyList<VagaResponse>>.Fail("Propriedade não encontrada.");
         }
@@ -172,8 +177,8 @@ public sealed class VagaServico : IVagaServico
             new HistoricoVaga { Id = Guid.NewGuid(), VagaId = vagaId, TipoEvento = tipoEvento, Descricao = descricao, UsuarioId = usuarioId, CreatedAtUtc = DateTime.UtcNow },
             cancellationToken).ConfigureAwait(false);
 
-    private static bool PertenceAoProprietario(Vaga? vaga, Guid proprietarioId) =>
-        vaga?.Propriedade is not null && vaga.Propriedade.ProprietarioId == proprietarioId;
+    private bool PertenceAoProprietario(Vaga? vaga, Guid proprietarioId, NivelAcesso nivel = NivelAcesso.Alterar) =>
+        vaga?.Propriedade is not null && _acesso.Pode(proprietarioId, vaga.Propriedade, nivel);
 
     private static string? NullIfBlank(string? valor) => string.IsNullOrWhiteSpace(valor) ? null : valor.Trim();
 

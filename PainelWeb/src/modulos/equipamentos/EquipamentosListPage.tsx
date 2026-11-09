@@ -19,6 +19,7 @@ import { useExcluirEquipamentoMutation } from './mutations/useExcluirEquipamento
 import { EquipamentoFormDialog } from './EquipamentoFormDialog';
 import { DetalheEquipamentoDrawer } from './DetalheEquipamentoDrawer';
 import type { EquipamentoAdmin, EstadoOperacionalEquipamento, FabricanteEquipamento } from './types';
+import { ROTULO_FABRICANTE } from '../../compartilhado/tipos/equipamento';
 
 const TAMANHO_PAGINA = 20;
 
@@ -61,7 +62,7 @@ export function EquipamentosListPage() {
   const colunas: ColunaTabela<EquipamentoAdmin>[] = [
     { cabecalho: 'Nome', render: (e) => e.nome },
     { cabecalho: 'Propriedade', render: (e) => e.propriedadeNome ?? '—' },
-    { cabecalho: 'Fabricante', render: (e) => e.fabricante },
+    { cabecalho: 'Fabricante', render: (e) => ROTULO_FABRICANTE[e.fabricante] ?? e.fabricante },
     { cabecalho: 'Número de Série', render: (e) => e.numeroSerie ?? '—' },
     { cabecalho: 'Conectividade', render: (e) => <BadgeStatus valor={e.status} opcoes={STATUS_OPCOES} /> },
     { cabecalho: 'Estado', render: (e) => <BadgeStatus valor={e.estadoOperacional} opcoes={ESTADO_OPCOES} /> },

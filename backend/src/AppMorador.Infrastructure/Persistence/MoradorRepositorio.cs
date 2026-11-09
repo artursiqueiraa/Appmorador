@@ -13,6 +13,12 @@ internal sealed class MoradorRepositorio : IMoradorRepositorio
         _db = db;
     }
 
+    public Task<Morador?> GetByIdIncluindoExcluidosAsync(Guid id, CancellationToken cancellationToken) =>
+        _db.Moradores
+            .IgnoreQueryFilters()
+            .Include(m => m.Unidade)
+            .FirstOrDefaultAsync(m => m.Id == id, cancellationToken);
+
     public Task<Morador?> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
         _db.Moradores
             .Include(m => m.Unidade)

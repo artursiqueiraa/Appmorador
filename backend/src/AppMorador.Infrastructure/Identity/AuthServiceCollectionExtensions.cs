@@ -17,6 +17,7 @@ using AppMorador.Application.Painel;
 using AppMorador.Application.Painel.Diagnostico;
 using AppMorador.Application.Painel.Equipamentos;
 using AppMorador.Application.Painel.VinculosEquipamento;
+using AppMorador.Application.Painel.NovasInstalacoes;
 using AppMorador.Application.PermissoesAcesso;
 using AppMorador.Application.PermissoesVeiculares;
 using AppMorador.Application.PontosAcesso;
@@ -93,6 +94,8 @@ public static class AuthServiceCollectionExtensions
         services.AddScoped<IAuditoriaMasterRepositorio, AuditoriaMasterRepositorio>();
         services.AddScoped<IAuditoriaService, AuditoriaService>();
         services.AddScoped<IPermissaoService, PermissaoService>();
+        // Sprint 25 (ADR 0041) — acesso por papel; Scoped: guarda os vínculos do usuário da requisição.
+        services.AddScoped<AppMorador.Application.Rbac.IAcessoPropriedadeServico, AppMorador.Application.Rbac.AcessoPropriedadeServico>();
         services.AddScoped<IUsuarioInternoServico, UsuarioInternoServico>();
         services.AddScoped<IModeloEquipamentoServico, ModeloEquipamentoServico>();
         services.AddScoped<IProvisionamentoServico, ProvisionamentoServico>();
@@ -108,6 +111,8 @@ public static class AuthServiceCollectionExtensions
         services.AddScoped<IEquipamentoAdminServico, EquipamentoAdminServico>();
         services.AddScoped<IVinculoEquipamentoPropriedadeRepositorio, VinculoEquipamentoPropriedadeRepositorio>();
         services.AddScoped<IVinculoEquipamentoServico, VinculoEquipamentoServico>();
+        // Akteck Seg (ADR 0035) — "Nova instalação" do Painel (orquestra cadastro + propriedade + provisionamento).
+        services.AddScoped<INovaInstalacaoServico, NovaInstalacaoServico>();
         services.AddScoped<IDiagnosticoEquipamentoRepositorio, DiagnosticoEquipamentoRepositorio>();
         services.AddScoped<IDiagnosticoServico, DiagnosticoServico>();
         services.AddScoped<IConsultaDashboardServico, ConsultaDashboardServico>();
@@ -148,6 +153,8 @@ public static class AuthServiceCollectionExtensions
         services.AddScoped<IPropriedadeServico, PropriedadeServico>();
         services.AddScoped<IUnidadeServico, UnidadeServico>();
         services.AddScoped<IMoradorServico, MoradorServico>();
+        // Akteck Seg (ADR 0036) — foto de rosto salva no servidor.
+        services.AddScoped<IFotoMoradorServico, FotoMoradorServico>();
         services.AddScoped<ICredencialServico, CredencialServico>();
         services.AddScoped<IPontoAcessoServico, PontoAcessoServico>();
         services.AddScoped<IPermissaoAcessoServico, PermissaoAcessoServico>();

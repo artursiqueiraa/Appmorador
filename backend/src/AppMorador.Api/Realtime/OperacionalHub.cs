@@ -45,7 +45,11 @@ public sealed class OperacionalHub : Hub
         var usuarioId = Context.User!.GetUsuarioId();
         var propriedade = await _propriedades.GetByIdAsync(propriedadeId, Context.ConnectionAborted).ConfigureAwait(false);
 
-        if (propriedade is null || propriedade.ProprietarioId != usuarioId)
+        // Sprint 25 (ADR 0041) — dono ou membro ativo (qualquer papel vê o tempo real).
+        var acesso = Context.GetHttpContext()!.RequestServices.GetRequiredService<AppMorador.Application.Rbac.IAcessoPropriedadeServico>();
+        await acesso.CarregarAsync(usuarioId, Context.ConnectionAborted).ConfigureAwait(false);
+
+        if (propriedade is null || !acesso.Pode(usuarioId, propriedade, AppMorador.Application.Rbac.NivelAcesso.Ver))
         {
             _logger.LogWarning(
                 "OperacionalHub: conexao {ConnectionId} (usuario {UsuarioId}) recusada para a propriedade {PropriedadeId} — sem posse",

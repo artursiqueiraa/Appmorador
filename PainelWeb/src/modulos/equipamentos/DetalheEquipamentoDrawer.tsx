@@ -2,6 +2,7 @@ import { Drawer, Box, Typography, IconButton, Stack, Chip, Divider, Button } fro
 import CloseIcon from '@mui/icons-material/Close';
 import EditIcon from '@mui/icons-material/Edit';
 import type { EquipamentoAdmin } from './types';
+import { ROTULO_FABRICANTE } from '../../compartilhado/tipos/equipamento';
 
 interface DetalheEquipamentoDrawerProps {
   equipamento: EquipamentoAdmin | null;
@@ -52,7 +53,7 @@ export function DetalheEquipamentoDrawer({ equipamento, onFechar, onEditar }: De
             <Campo rotulo="Propriedade" valor={equipamento.propriedadeNome} />
 
             <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-              <Chip size="small" label={equipamento.fabricante} variant="outlined" />
+              <Chip size="small" label={ROTULO_FABRICANTE[equipamento.fabricante] ?? equipamento.fabricante} variant="outlined" />
               <Chip size="small" label={equipamento.status} color={equipamento.status === 'Online' ? 'success' : equipamento.status === 'Offline' ? 'error' : 'default'} />
               <Chip size="small" label={equipamento.estadoOperacional} variant="outlined" />
             </Box>

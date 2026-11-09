@@ -59,7 +59,7 @@ public class NotificationDispatcherTests
         var propriedadeId = Guid.NewGuid();
         var notificationService = new Mock<INotificationService>();
         var debounce = new Mock<IDebounceNotificacao>();
-        debounce.Setup(d => d.PodeNotificar(It.IsAny<EventoNotificacaoTipo>(), It.IsAny<Guid>())).Returns(true);
+        debounce.Setup(d => d.PodeNotificarAsync(It.IsAny<EventoNotificacaoTipo>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
 
         var dispatcher = new NotificationDispatcher(notificationService.Object, debounce.Object, NullLogger<NotificationDispatcher>.Instance);
 
@@ -82,7 +82,7 @@ public class NotificationDispatcherTests
         var propriedadeId = Guid.NewGuid();
         var notificationService = new Mock<INotificationService>();
         var debounce = new Mock<IDebounceNotificacao>();
-        debounce.Setup(d => d.PodeNotificar(It.IsAny<EventoNotificacaoTipo>(), It.IsAny<Guid>())).Returns(true);
+        debounce.Setup(d => d.PodeNotificarAsync(It.IsAny<EventoNotificacaoTipo>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
         var dispatcher = new NotificationDispatcher(notificationService.Object, debounce.Object, NullLogger<NotificationDispatcher>.Instance);
 
         await dispatcher.NotificarAsync(EventoNotificacaoTipo.VisitanteAutorizado, ContextoPropriedade(propriedadeId, "João"), CancellationToken.None);
@@ -97,7 +97,7 @@ public class NotificationDispatcherTests
         var propriedadeId = Guid.NewGuid();
         var notificationService = new Mock<INotificationService>();
         var debounce = new Mock<IDebounceNotificacao>();
-        debounce.Setup(d => d.PodeNotificar(It.IsAny<EventoNotificacaoTipo>(), It.IsAny<Guid>())).Returns(true);
+        debounce.Setup(d => d.PodeNotificarAsync(It.IsAny<EventoNotificacaoTipo>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
         var dispatcher = new NotificationDispatcher(notificationService.Object, debounce.Object, NullLogger<NotificationDispatcher>.Instance);
 
         await dispatcher.NotificarAsync(EventoNotificacaoTipo.VisitanteAutorizado, ContextoPropriedade(propriedadeId), CancellationToken.None);
@@ -113,7 +113,7 @@ public class NotificationDispatcherTests
         var equipamentoId = Guid.NewGuid();
         var notificationService = new Mock<INotificationService>();
         var debounce = new Mock<IDebounceNotificacao>();
-        debounce.Setup(d => d.PodeNotificar(It.IsAny<EventoNotificacaoTipo>(), It.IsAny<Guid>())).Returns(true);
+        debounce.Setup(d => d.PodeNotificarAsync(It.IsAny<EventoNotificacaoTipo>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
         var dispatcher = new NotificationDispatcher(notificationService.Object, debounce.Object, NullLogger<NotificationDispatcher>.Instance);
 
         await dispatcher.NotificarAsync(EventoNotificacaoTipo.EquipamentoOffline, ContextoEquipamento(propriedadeId, equipamentoId), CancellationToken.None);
@@ -132,13 +132,13 @@ public class NotificationDispatcherTests
     {
         var notificationService = new Mock<INotificationService>();
         var debounce = new Mock<IDebounceNotificacao>();
-        debounce.Setup(d => d.PodeNotificar(It.IsAny<EventoNotificacaoTipo>(), It.IsAny<Guid>())).Returns(false);
+        debounce.Setup(d => d.PodeNotificarAsync(It.IsAny<EventoNotificacaoTipo>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync(false);
         var dispatcher = new NotificationDispatcher(notificationService.Object, debounce.Object, NullLogger<NotificationDispatcher>.Instance);
 
         await dispatcher.NotificarAsync(EventoNotificacaoTipo.AlarmeDisparado, ContextoPropriedade(Guid.NewGuid()), CancellationToken.None);
 
         notificationService.Verify(s => s.EnviarParaPropriedadeAsync(It.IsAny<NotificacaoPayload>(), It.IsAny<CancellationToken>()), Times.Never);
-        debounce.Verify(d => d.RegistrarEnvio(It.IsAny<EventoNotificacaoTipo>(), It.IsAny<Guid>()), Times.Never);
+        debounce.Verify(d => d.RegistrarEnvioAsync(It.IsAny<EventoNotificacaoTipo>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -148,15 +148,15 @@ public class NotificationDispatcherTests
         var equipamentoId = Guid.NewGuid();
         var notificationService = new Mock<INotificationService>();
         var debounce = new Mock<IDebounceNotificacao>();
-        debounce.Setup(d => d.PodeNotificar(It.IsAny<EventoNotificacaoTipo>(), It.IsAny<Guid>())).Returns(true);
+        debounce.Setup(d => d.PodeNotificarAsync(It.IsAny<EventoNotificacaoTipo>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
         var dispatcher = new NotificationDispatcher(notificationService.Object, debounce.Object, NullLogger<NotificationDispatcher>.Instance);
 
         await dispatcher.NotificarAsync(EventoNotificacaoTipo.EquipamentoOffline, ContextoEquipamento(propriedadeId, equipamentoId), CancellationToken.None);
         await dispatcher.NotificarAsync(EventoNotificacaoTipo.AlarmeDisparado, ContextoPropriedade(propriedadeId), CancellationToken.None);
 
-        debounce.Verify(d => d.PodeNotificar(EventoNotificacaoTipo.EquipamentoOffline, equipamentoId), Times.Once);
-        debounce.Verify(d => d.RegistrarEnvio(EventoNotificacaoTipo.EquipamentoOffline, equipamentoId), Times.Once);
-        debounce.Verify(d => d.PodeNotificar(EventoNotificacaoTipo.AlarmeDisparado, propriedadeId), Times.Once);
-        debounce.Verify(d => d.RegistrarEnvio(EventoNotificacaoTipo.AlarmeDisparado, propriedadeId), Times.Once);
+        debounce.Verify(d => d.PodeNotificarAsync(EventoNotificacaoTipo.EquipamentoOffline, equipamentoId, It.IsAny<CancellationToken>()), Times.Once);
+        debounce.Verify(d => d.RegistrarEnvioAsync(EventoNotificacaoTipo.EquipamentoOffline, equipamentoId, It.IsAny<CancellationToken>()), Times.Once);
+        debounce.Verify(d => d.PodeNotificarAsync(EventoNotificacaoTipo.AlarmeDisparado, propriedadeId, It.IsAny<CancellationToken>()), Times.Once);
+        debounce.Verify(d => d.RegistrarEnvioAsync(EventoNotificacaoTipo.AlarmeDisparado, propriedadeId, It.IsAny<CancellationToken>()), Times.Once);
     }
 }

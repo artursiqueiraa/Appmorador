@@ -5,6 +5,9 @@ public enum PrioridadeNotificacao
     Baixa,
     Normal,
     Alta,
+
+    /// <summary>Sprint 24 (ADR 0040) — alerta crítico: canal Android próprio, som de alarme, ignora "Não perturbe" se o usuário permitir.</summary>
+    Critica,
 }
 
 /// <summary>
@@ -29,6 +32,9 @@ public sealed class NotificacaoPayload
     public required string Acao { get; init; }
 
     public PrioridadeNotificacao Prioridade { get; init; } = PrioridadeNotificacao.Normal;
+
+    /// <summary>Sprint 24 — alerta crítico que a notificação abre (tela "Estou ciente").</summary>
+    public Guid? AlertaId { get; init; }
 }
 
 /// <summary>Contexto necessário para o <see cref="INotificationDispatcher"/> montar a mensagem certa por tipo de evento.</summary>
@@ -44,4 +50,10 @@ public sealed class ContextoNotificacao
 
     /// <summary>Nome do visitante autorizado, etc. — só relevante para alguns tipos de evento.</summary>
     public string? NomeContextual { get; init; }
+
+    /// <summary>Sprint 24 — alerta crítico relacionado; quando presente, o debounce é por alerta e a notificação é crítica.</summary>
+    public Guid? AlertaId { get; init; }
+
+    /// <summary>Sprint 24 — o que aconteceu, em linguagem simples ("Movimento detectado — Sala").</summary>
+    public string? Descricao { get; init; }
 }

@@ -44,7 +44,7 @@ export function ImpersonationBanner() {
     } finally {
       endImpersonation();
       setEncerrando(false);
-      mostrarToast('Sessão de impersonation encerrada.', 'info');
+      mostrarToast('Você saiu da conta do cliente.', 'info');
       navigate('/suporte/selecionar-cliente', { replace: true });
     }
   };
@@ -58,7 +58,7 @@ export function ImpersonationBanner() {
         right: 0,
         zIndex: (theme) => theme.zIndex.drawer + 10,
         bgcolor: 'warning.main',
-        color: '#1A1200',
+        color: 'warning.contrastText',
         px: 2,
         py: 1,
         display: 'flex',
@@ -68,11 +68,11 @@ export function ImpersonationBanner() {
       }}
     >
       <Typography variant="body1" sx={{ fontWeight: 600 }}>
-        Você está atuando como {impersonation.clienteNome} — {impersonation.propriedadeNome} — expira em{' '}
+        Você está acessando como {impersonation.clienteNome} — {impersonation.propriedadeNome} — expira em{' '}
         {formatarTempoRestante(msRestante)}
       </Typography>
       <Button size="small" variant="contained" color="inherit" onClick={() => void encerrar()} disabled={encerrando}>
-        Encerrar Sessão do Cliente
+        Sair da conta do cliente
       </Button>
     </Box>
   );

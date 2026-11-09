@@ -18,6 +18,7 @@ import DescriptionIcon from '@mui/icons-material/Description';
 import { auditoriaService } from '../services/auditoriaService';
 import { EmptyState } from '../components/EmptyState';
 import type { TipoAcaoAuditoria } from '../types/api';
+import { descreverAtividade, ehAlertaDeSeguranca, formatarDataHora } from '../modulos/dashboard/rotulosDashboard';
 
 const TODOS = 'Todos' as const;
 
@@ -88,8 +89,9 @@ export function SuporteLogsPage() {
             {filtrados.map((registro) => (
               <ListItem key={registro.id} divider>
                 <ListItemText
-                  primary={`${registro.usuarioNome} — ${registro.acao}`}
-                  secondary={`${new Date(registro.dataHoraUtc).toLocaleString('pt-BR')}${registro.entidade ? ` · ${registro.entidade}` : ''}`}
+                  primary={descreverAtividade(registro)}
+                  secondary={registro.detalhes ? `${formatarDataHora(registro.dataHoraUtc)}, ${registro.detalhes}` : formatarDataHora(registro.dataHoraUtc)}
+                  slotProps={{ primary: { sx: { color: ehAlertaDeSeguranca(registro) ? 'error.main' : 'text.primary' } } }}
                 />
                 {registro.ipAddress ? <Chip size="small" variant="outlined" label={registro.ipAddress} /> : null}
               </ListItem>

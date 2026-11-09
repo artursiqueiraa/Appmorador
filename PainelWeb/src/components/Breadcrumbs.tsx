@@ -7,7 +7,15 @@ export interface BreadcrumbItem {
 }
 
 /** Sprint 22A (Fase 7) — navegação hierárquica em toda tela interna. */
-export function Breadcrumbs({ itens }: { itens: BreadcrumbItem[] }) {
+/**
+ * Akteck Seg (ADR 0035) — o cabeçalho já mostra "Grupo / Página". Aqui a trilha só aparece em
+ * telas de detalhe (dois níveis ou mais) e sem a raiz "Dashboard", que repetia o menu.
+ */
+export function Breadcrumbs({ itens: todos }: { itens: BreadcrumbItem[] }) {
+  const itens = todos.filter((i) => i.rotulo !== 'Dashboard');
+  if (itens.length <= 1) {
+    return null;
+  }
   return (
     <MuiBreadcrumbs sx={{ mb: 2 }}>
       {itens.map((item, indice) =>

@@ -538,6 +538,9 @@ específica, ex. `Conectividade`) que registre uma linha toda vez que
 `EquipamentoIntegracaoServico`/`JflComandoServico` mudar `Equipamento.Status`, reaproveitando o
 `IFonteEventos` já existente — sem duplicar a Central de Eventos.
 
+**Resolvido (Sprint 24, ADR 0040, 2026-11-08)**: `VigiaConectividadeJfl` grava `EventosConectividade`
+(Perdida/Restabelecida) e a Central de Eventos os mostra (`ConectividadeFonteEventos`).
+
 ## 25. Grupos SignalR por Perfil de usuário não implementados (Sprint 14)
 
 **Descrição**: a missão da Sprint 14 pediu que as conexões do `OperacionalHub` fossem organizadas
@@ -762,6 +765,8 @@ momento, `perfil` local deveria ser substituído pelo perfil real vindo da API.
 campo vindo de `EntrarResponse`, mantendo a mesma interface (`useAuth().perfil`) para não exigir
 mudança nas telas que já o consomem.
 
+**Resolvido (Sprint 25, ADR 0041, 2026-11-08)**: o modo técnico só vale para Proprietário/Gerente (papel real vindo da API); Membro e Visualizador nunca o veem. A preferência local virou só "Mostrar detalhes técnicos".
+
 ## 35. Rótulos amigáveis de PGM são só locais, um por dispositivo (Sprint 17)
 
 **Descrição**: `acessos/pgmLabels.ts` guarda o mapeamento "PGM 3" → "Abrir portão" só localmente
@@ -803,6 +808,8 @@ de `carregarComandosJfl` (`screens/acessos/AccessScreen.tsx`) para incluir tamb�
 equipamentos, generalizando o nome da função.
 
 ## 37. Sem rotina de backup de banco agendada/automática (Sprint 17.5)
+
+> **Resolvida na Sprint 27 (ADR 0043)**: `scripts/backup_agendado.ps1` no Agendador de Tarefas do Windows (3h), retenção 7 diários + 4 semanais e teste de restauração automático em `appmorador_restore_teste`, com resultado no painel.
 
 **Descrição**: `scripts/backup_database.ps1` gera um dump completo do banco sob demanda — não há
 nenhum agendamento (Task Scheduler do Windows ou equivalente) rodando isso periodicamente.
@@ -895,6 +902,9 @@ horizontalmente.
 
 **Sugestão de resolução**: substituir por um cache distribuído (Redis) com a mesma interface
 `IDebounceNotificacao`, sem mudar `NotificationDispatcher`.
+
+**Resolvido (Sprint 24, ADR 0040, 2026-11-08)**: substituído por `DebounceNotificacaoPersistido`
+(tabela `ControlesEnvioNotificacao`); sobrevive a reinício e é compartilhado entre instâncias.
 
 ## 42. Preferências de canal de notificação espelhadas localmente, sem `GET` no backend (Sprint 19)
 
@@ -1029,6 +1039,8 @@ desta Sprint (que tratou Equipamentos/Provisionamentos/Diagnóstico, não gestã
 cliente); a interface do Painel Web permanece Somente Leitura com a justificativa já registrada
 acima.
 
+**Resolvido (Sprint 25, ADR 0041, 2026-11-08)**: tela "Minha conta" — editar dados, trocar senha, excluir conta (anonimizada).
+
 ## 48. Regra de "1 vínculo ativo por equipamento" garantida só em código, não no banco (Sprint 22B)
 
 **Descrição**: `VinculoEquipamentoPropriedade` não tem nenhuma constraint de banco impedindo dois
@@ -1090,3 +1102,248 @@ Offline/com dados desatualizados até uma sincronização manual ou um novo cada
 **Sugestão de resolução**: se o padrão de uso mostrar que Técnicos esperam reconexão automática ao
 editar, replicar a mesma chamada de `ConectarEDescobrirControlIdAsync`/`ConectarIntelbrasAsync` já
 usada em `CriarAsync`.
+
+## 51. Web App guarda tokens de sessão em `localStorage` (Web App, ADR 0034)
+
+> **Resolvida na Sprint 27 (ADR 0043)**: refresh token em cookie `HttpOnly; Secure; SameSite=Strict; Path=/api/auth`, access token só em memória. O painel admin tem o mesmo problema: item 68.
+
+**Descrição**: no navegador não existe Keychain/Keystore, então o `webapp/` usa o fallback de
+`localStorage` que já existia em `secureStorage.ts` para o access token e o refresh token. Isso
+contraria `.rules/mobile.md` ("sessão sempre no armazenamento seguro da plataforma").
+
+**Motivo**: a alternativa segura (cookie `HttpOnly` + `SameSite` emitido pela Api) exige mudar o
+fluxo de autenticação do backend, o que ficou fora do escopo "só pegar o que tem" desta entrega.
+
+**Impacto**: médio. Qualquer XSS no web app consegue ler o refresh token (validade de 30 dias).
+Hoje o app não renderiza HTML de terceiros, o que reduz, mas não elimina, a superfície.
+
+**Prioridade**: alta antes de publicar o web app fora do ambiente de desenvolvimento.
+
+**Sugestão de resolução**: refresh token em cookie `HttpOnly; Secure; SameSite=Strict` emitido pela
+Api, com o access token só em memória; CSP restritiva no host do web app.
+
+## 52. `webapp/src` é cópia de `mobile/src` — correções não se propagam (Web App, ADR 0034)
+
+**Descrição**: o web app foi criado copiando o Mobile, a pedido do usuário (sem alterar
+`mobile/`). Toda mudança futura em uma das pastas precisa ser replicada manualmente na outra.
+
+**Motivo**: requisito explícito de não tocar no Mobile.
+
+**Impacto**: médio, e cresce a cada Sprint. É risco de bug corrigido só de um lado e de o visual
+"idêntico" ir divergindo.
+
+**Prioridade**: média.
+
+**Sugestão de resolução**: extrair `src/` comum para um pacote compartilhado (ou ligar o alvo web
+no próprio Mobile, com os 9 pontos de adaptação da ADR 0034 atrás de `Platform.OS === 'web'` ou de
+arquivos `.web.ts`).
+
+**Resolvido (Sprint 23, ADR 0039, 2026-11-08)**: o `webapp/` gera web e Android; APK aprovado em
+dispositivo e `mobile/` arquivado na tag git `mobile-legado`.
+
+## 53. Borda dos campos de formulário com contraste 1.47:1 (Web App, audit Hallmark)
+
+**Descrição**: o audit Hallmark/sloplint (regra 40) mediu 1.47:1 entre a borda de `TextField` e o
+fundo. O recomendado para limites de componentes é ≥ 3:1 (WCAG 1.4.11). Isso vale também para o
+Mobile, que usa os mesmos tokens (`colors.line` sobre `colors.surface`).
+
+**Motivo**: não corrigido para manter o web app idêntico ao Mobile, conforme requisito da entrega.
+
+**Atualização (ADR 0035)**: corrigido no Web App (`TextField` usa `colors.borderStrong`, 3.3:1). Continua pendente só no app mobile.
+
+**Impacto**: baixo/médio. Baixa visão tem mais dificuldade de localizar os campos.
+
+**Prioridade**: média.
+
+**Sugestão de resolução**: decisão do `design-system`: escurecer o preenchimento do campo ou clarear
+`colors.line` nos dois apps ao mesmo tempo.
+
+## 54. ~~Criação de usuário interno não valida a senha no servidor~~ (resolvido, ADR 0036)
+
+**Descrição**: `CriarUsuarioInternoRequest` (`api/usuarios-internos`, Master) não tem
+`[Required]`/`[EmailAddress]`/regex de senha, ao contrário de `CadastrarUsuarioRequest`. Qualquer
+senha (inclusive vazia) é aceita pela API.
+
+**Motivo**: pré-existente (Sprint 21). Encontrado ao construir a tela Equipe interna. Fora do escopo
+combinado desta entrega (o backend só ganhou o endpoint da Nova instalação).
+
+**Impacto**: médio. Só um Master pode chamar o endpoint, mas uma conta interna com senha fraca dá
+acesso amplo ao painel. Hoje a tela aplica a regra no formulário (`pattern`), o que não protege
+chamadas diretas à API.
+
+**Prioridade**: alta.
+
+**Sugestão de resolução**: copiar as DataAnnotations de `CadastrarUsuarioRequest` para
+`CriarUsuarioInternoRequest` e cobrir com teste.
+
+## 55. Link "Termos e Privacidade" aponta para o domínio antigo (Akteck Seg, ADR 0035)
+
+**Descrição**: `webapp/src/screens/ajustes/SettingsScreen.tsx` mostra `appmorador.com.br/termos`.
+Não foi trocado porque não existe ainda um domínio/página real da Akteck Seg (nunca inventar URL).
+
+**Prioridade**: média, antes de publicar.
+
+**Sugestão de resolução**: trocar quando o domínio oficial existir.
+
+**Resolvido em parte (Sprint 26, ADR 0042, 2026-11-08)**: Termos e Privacidade agora são telas do app (menu "Privacidade e termos" e cadastro facial); dados da empresa pendentes (dívida 66).
+
+## 56. Fila de atenção e equipamentos livres usam amostra de 100 itens (Akteck Seg, ADR 0035)
+
+**Descrição**: o Dashboard ("Clientes que precisam de atenção") e a Nova instalação ("equipamentos
+livres") filtram no cliente a primeira página (100 itens) de `api/diagnostico/equipamentos/status`,
+`api/painel/equipamentos` e `api/painel/provisionamentos`. As telas avisam quando a base é maior.
+
+**Prioridade**: baixa enquanto a base for pequena.
+
+**Sugestão de resolução**: filtros no backend (`?precisaAtencao=true`, `?livres=true`).
+
+## 57. Foto facial não é enviada ao leitor físico (ADR 0036)
+
+**Descrição**: a foto fica salva no servidor e a pessoa ganha credencial Facial, mas o envio do rosto
+para o equipamento (Control iD) não existe. O equipamento ainda não reconhece a pessoa pela foto
+cadastrada no app.
+
+**Prioridade**: alta para o produto (é o que o cliente espera do "cadastro facial").
+
+**Sugestão de resolução**: estender `IControlIdProvider.SincronizarCredenciaisAsync` para enviar a
+imagem; validar em hardware real antes de anunciar.
+
+**Resolvido (Sprint 26, ADR 0042, 2026-11-08)**: rosto enviado/apagado nos leitores Control iD e Hikvision; pendente só a homologação física.
+
+## 58. Telas da referência visual sem funcionalidade real por trás (ADR 0037)
+
+**Descrição**: estes itens da referência não foram implementados como botões, porque não há suporte real:
+"Manter aberta"/"Fechar" porta, câmera ao vivo/gravar/áudio/falar, vínculos Lojista e Prestador, abas
+de categoria em Eventos (eventos sem categoria), contagem "Acessos hoje" e recuperação de senha por
+e-mail.
+
+**Prioridade**: média (cada um é uma funcionalidade de backend própria).
+
+**Resolvido em parte (Sprint 25, 2026-11-08)**: Vagas e Entregas só aparecem em condomínio.
+
+## 59. Identidade visual diferente entre Web App e app mobile (ADR 0037)
+
+**Descrição**: o Web App usa a identidade oficial (verde neon), e o mobile continua com o visual do
+ADR 0019, por decisão do usuário de não tocar no mobile nesta etapa.
+
+**Prioridade**: média.
+
+**Resolvido (Sprint 23, ADR 0039, 2026-11-08)**: o APK sai do `webapp/`, com a identidade Akteck
+Seg. Fechado junto com o item 52.
+
+## 60. APK de teste usa HTTP na rede local e o IP da máquina fixo no build (Sprint 23)
+
+**Descrição**: o perfil `preview` do `webapp/eas.json` grava `EXPO_PUBLIC_API_URL` com o IP local
+da máquina de desenvolvimento (`192.168.100.2`) e o Android libera HTTP (`usesCleartextTraffic`).
+Mesmo comportamento do `mobile/` desde a Sprint 20.
+
+**Motivo**: a API de desenvolvimento roda em HTTP na rede local; não há servidor publicado.
+
+**Impacto**: médio. Se o IP mudar (DHCP), o APK para de achar a API e precisa ser gerado de novo
+(ocorreu na Sprint 20). Em produção, HTTP sem criptografia é inaceitável.
+
+**Prioridade**: alta antes de qualquer cliente real.
+
+**Sugestão de resolução**: publicar a API com HTTPS (domínio próprio) e usar essa URL no perfil
+`production`; remover `usesCleartextTraffic` desse perfil.
+
+## 61. Build EAS precisa de `EAS_NO_VCS` por causa de symlink em `.claude/skills` (Sprint 23)
+
+**Descrição**: o EAS copia o repositório inteiro para montar o pacote; a cópia falha no Windows
+(`EPERM`) no symlink `.claude/skills/hallmark` → `.agents/skills/hallmark`. Contorno: rodar o build
+com `EAS_NO_VCS=1` e `EAS_PROJECT_ROOT` apontando para `webapp/`.
+
+**Impacto**: baixo. Só afeta quem dispara build desta máquina; o comando está documentado no
+`webapp/README.md`.
+
+**Prioridade**: baixa.
+
+**Sugestão de resolução**: trocar o symlink por cópia (ou ativar o Modo de Desenvolvedor do
+Windows, que permite criar symlinks) e voltar ao build com git.
+
+## 62. Códigos Contact ID do padrão SIA DC-05 sem homologação na central JFL (Sprint 24)
+
+**Descrição**: o catálogo passou a reconhecer pânico, coação, violação, energia e bateria pelo
+padrão público SIA DC-05. Só o `1130` tem confirmação documental na JFL; os demais estão marcados
+`PendenteHomologacao = true`.
+
+**Impacto**: médio. Se a JFL usar outro código para algum desses eventos, ele cai em "código
+desconhecido" (log de aviso) e não notifica.
+
+**Prioridade**: alta, junto com a homologação física pendente.
+
+**Sugestão de resolução**: no teste com a central real, provocar cada evento, conferir o código em
+`RegistrosEventoAlarme` e ajustar o catálogo.
+
+## 63. SMS de contatos de emergência em modo simulado (Sprint 24)
+
+**Descrição**: `IEnvioSms` só tem a implementação `EnvioSmsSimulado`, que registra no log o que
+enviaria. Nenhum contato recebe SMS de verdade.
+
+**Impacto**: alto para o produto. O último nível do escalonamento não chega a ninguém.
+
+**Prioridade**: alta antes de vender.
+
+**Sugestão de resolução**: contratar um provedor (Zenvia, Twilio…), implementar `IEnvioSms` com ele
+e guardar a credencial em user-secrets/variável de ambiente.
+
+## 64. Escalonamento e vigia rodam dentro da Api (Sprint 24)
+
+**Descrição**: `EscalonamentoAlertasHostedService` e `VigiaConectividadeJfl` são `BackgroundService`
+da própria Api. Se a Api cair, ninguém escalona nem detecta queda de central.
+
+**Impacto**: médio. Com a Api fora, também não chegam eventos da central, então nada novo é perdido.
+Mas uma Api parada não avisa ninguém de que está parada.
+
+**Prioridade**: média (Sprint 27, confiabilidade).
+
+**Sugestão de resolução**: monitoramento externo da Api (health check com alerta) antes de buscar
+worker separado.
+
+## 65. Push com o app fechado não funciona: Firebase não configurado (Sprint 24)
+
+**Descrição**: o app é gerado sem `google-services.json`, então o Android não entrega token de push
+e nenhum dispositivo é registrado; o backend roda o `FirebaseNotificationProvider` em modo sem
+credencial. Com o app aberto o alerta chega (tempo real + consulta a cada 15 s); fechado, nada.
+
+**Impacto**: alto — é o principal caminho do alerta crítico.
+
+**Prioridade**: alta (bloqueia venda).
+
+**Sugestão de resolução**: criar o projeto Firebase (pacote `com.akteck.seg`), colocar o
+`google-services.json` no app (`android.googleServicesFile`) e a chave da conta de serviço no
+backend (`Firebase:CredenciaisPath` via user-secrets); gerar novo APK.
+
+## 66. Textos legais com dados da empresa "a preencher" e sem revisão jurídica (Sprint 26)
+
+**Descrição**: Termos de Uso e Política de Privacidade publicados no app com razão social, CNPJ e
+e-mail do encarregado marcados "[A PREENCHER]" (`webapp/src/screens/legal/textosLegais.ts`). Texto
+técnico, sem revisão de advogado.
+
+**Prioridade**: alta antes de vender.
+
+## 67. Fotos de rosto anteriores à Sprint 26 sem consentimento registrado
+
+**Descrição**: as fotos já cadastradas continuam no servidor sem registro de consentimento. Trocar a
+foto já exige consentimento, mas as existentes não foram recolhidas.
+
+**Sugestão de resolução**: pedir o consentimento na próxima abertura do cadastro da pessoa, ou apagar
+as fotos sem consentimento após um prazo de aviso.
+
+## 68. Painel admin guarda tokens de sessão em `localStorage` (Sprint 27)
+
+**Descrição**: `PainelWeb/src/stores/authStore.ts` persiste access e refresh token no `localStorage`,
+o mesmo problema que a dívida 51 tinha no app web. Ficou fora do escopo da Sprint 27.
+
+**Impacto**: alto antes de publicar o painel fora da rede interna — o painel tem usuários Master.
+
+**Sugestão de resolução**: reaproveitar o cookie HttpOnly da Sprint 27 (`X-Cliente: web`) no painel.
+
+## 69. Queda do próprio backend não gera aviso (Sprint 27)
+
+**Descrição**: o vigia de saúde roda dentro do backend; se o backend cai, ninguém é avisado (o painel
+só mostra "não foi possível falar com o servidor" para quem estiver olhando).
+
+**Sugestão de resolução**: monitor externo (ex.: UptimeRobot ou tarefa agendada em outra máquina)
+chamando `GET /health` a cada minuto quando houver ambiente de produção.
+

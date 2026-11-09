@@ -15,6 +15,9 @@ import { RoleRoute } from './RoleRoute';
 import { EquipamentosListPage } from '../modulos/equipamentos/EquipamentosListPage';
 import { ProvisionamentosPage } from '../modulos/provisionamentos/ProvisionamentosPage';
 import { DiagnosticoEquipamentosPage } from '../modulos/diagnostico/DiagnosticoEquipamentosPage';
+import { ModelosEquipamentoPage } from '../modulos/modelos/ModelosEquipamentoPage';
+import { EquipeInternaPage } from '../modulos/equipe/EquipeInternaPage';
+import { NovaInstalacaoPage } from '../modulos/novaInstalacao/NovaInstalacaoPage';
 
 export function AppRoutes() {
   return (
@@ -44,6 +47,11 @@ export function AppRoutes() {
             <Route path="/equipamentos" element={<EquipamentosListPage />} />
             <Route path="/provisionamentos" element={<ProvisionamentosPage />} />
             <Route path="/diagnostico-equipamentos" element={<DiagnosticoEquipamentosPage />} />
+            <Route path="/modelos-equipamento" element={<ModelosEquipamentoPage />} />
+          </Route>
+          <Route element={<RoleRoute permitido={['Master']} />}>
+            <Route path="/equipe-interna" element={<EquipeInternaPage />} />
+            <Route path="/nova-instalacao" element={<NovaInstalacaoPage />} />
           </Route>
 
           <Route path="*" element={<NotFoundPage />} />

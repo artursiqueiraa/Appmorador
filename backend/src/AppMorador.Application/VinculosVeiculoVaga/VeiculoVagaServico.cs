@@ -1,3 +1,4 @@
+using AppMorador.Application.Rbac;
 using AppMorador.Application.Common;
 using AppMorador.Domain.Entities;
 using AppMorador.Domain.Repositories;
@@ -12,6 +13,8 @@ namespace AppMorador.Application.VinculosVeiculoVaga;
 /// </summary>
 public sealed class VeiculoVagaServico : IVeiculoVagaServico
 {
+    private readonly IAcessoPropriedadeServico _acesso;
+
     private readonly IVeiculoRepositorio _veiculos;
     private readonly IVagaRepositorio _vagas;
     private readonly IVinculoVeiculoVagaRepositorio _vinculos;
@@ -21,8 +24,10 @@ public sealed class VeiculoVagaServico : IVeiculoVagaServico
         IVeiculoRepositorio veiculos,
         IVagaRepositorio vagas,
         IVinculoVeiculoVagaRepositorio vinculos,
-        IHistoricoVeiculoRepositorio historico)
+        IHistoricoVeiculoRepositorio historico,
+        IAcessoPropriedadeServico acesso)
     {
+        _acesso = acesso;
         _veiculos = veiculos;
         _vagas = vagas;
         _vinculos = vinculos;
@@ -33,14 +38,14 @@ public sealed class VeiculoVagaServico : IVeiculoVagaServico
         Guid proprietarioId, Guid veiculoId, VincularVeiculoVagaRequest request, CancellationToken cancellationToken)
     {
         var veiculo = await _veiculos.GetByIdAsync(veiculoId, cancellationToken).ConfigureAwait(false);
-        if (veiculo?.Morador?.Unidade?.Propriedade is null || veiculo.Morador.Unidade.Propriedade.ProprietarioId != proprietarioId)
+        if (veiculo?.Morador?.Unidade?.Propriedade is null || !_acesso.Pode(proprietarioId, veiculo.Morador.Unidade.Propriedade, NivelAcesso.Alterar))
         {
             return Result<VinculoVeiculoVagaResponse>.Fail("Veículo não encontrado.");
         }
 
         var vaga = await _vagas.GetByIdAsync(request.VagaId, cancellationToken).ConfigureAwait(false);
         if (vaga is null || vaga.Propriedade is null ||
-            vaga.PropriedadeId != veiculo.Morador.Unidade.PropriedadeId || vaga.Propriedade.ProprietarioId != proprietarioId)
+            vaga.PropriedadeId != veiculo.Morador.Unidade.PropriedadeId || !_acesso.Pode(proprietarioId, vaga.Propriedade, NivelAcesso.Alterar))
         {
             return Result<VinculoVeiculoVagaResponse>.Fail("Vaga não encontrada.");
         }
@@ -97,7 +102,7 @@ public sealed class VeiculoVagaServico : IVeiculoVagaServico
     public async Task<Result> DesvincularAsync(Guid proprietarioId, Guid veiculoId, CancellationToken cancellationToken)
     {
         var veiculo = await _veiculos.GetByIdAsync(veiculoId, cancellationToken).ConfigureAwait(false);
-        if (veiculo?.Morador?.Unidade?.Propriedade is null || veiculo.Morador.Unidade.Propriedade.ProprietarioId != proprietarioId)
+        if (veiculo?.Morador?.Unidade?.Propriedade is null || !_acesso.Pode(proprietarioId, veiculo.Morador.Unidade.Propriedade, NivelAcesso.Alterar))
         {
             return Result.Fail("Veículo não encontrado.");
         }
@@ -122,7 +127,7 @@ public sealed class VeiculoVagaServico : IVeiculoVagaServico
         Guid proprietarioId, Guid veiculoId, CancellationToken cancellationToken)
     {
         var veiculo = await _veiculos.GetByIdAsync(veiculoId, cancellationToken).ConfigureAwait(false);
-        if (veiculo?.Morador?.Unidade?.Propriedade is null || veiculo.Morador.Unidade.Propriedade.ProprietarioId != proprietarioId)
+        if (veiculo?.Morador?.Unidade?.Propriedade is null || !_acesso.Pode(proprietarioId, veiculo.Morador.Unidade.Propriedade, NivelAcesso.Ver))
         {
             return Result<IReadOnlyList<VinculoVeiculoVagaResponse>>.Fail("Veículo não encontrado.");
         }

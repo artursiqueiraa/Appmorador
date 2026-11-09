@@ -23,4 +23,10 @@ public class Propriedade : EntidadeComSoftDelete
     public Guid ProprietarioId { get; set; }
 
     public Usuario? Proprietario { get; set; }
+
+    /// <summary>
+    /// Sprint 24 (ADR 0040) — minutos sem confirmação até um alerta crítico avisar o próximo nível
+    /// (membros, depois contatos de emergência). Faixa aceita: 1 a 30.
+    /// </summary>
+    public int MinutosEscalonamento { get; set; } = 2;
 }

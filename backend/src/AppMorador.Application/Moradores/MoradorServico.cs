@@ -1,3 +1,4 @@
+using AppMorador.Application.Rbac;
 using AppMorador.Application.Common;
 using AppMorador.Domain.Entities;
 using AppMorador.Domain.Repositories;
@@ -11,6 +12,8 @@ namespace AppMorador.Application.Moradores;
 /// </summary>
 public sealed class MoradorServico : IMoradorServico
 {
+    private readonly IAcessoPropriedadeServico _acesso;
+
     private readonly IUnidadeRepositorio _unidades;
     private readonly IMoradorRepositorio _moradores;
     private readonly ICredencialRepositorio _credenciais;
@@ -30,8 +33,10 @@ public sealed class MoradorServico : IMoradorServico
         IVeiculoRepositorio veiculos,
         IVinculoVeiculoVagaRepositorio vinculosVeiculoVaga,
         IPermissaoVeicularRepositorio permissoesVeiculares,
-        IEntregaRepositorio entregas)
+        IEntregaRepositorio entregas,
+        IAcessoPropriedadeServico acesso)
     {
+        _acesso = acesso;
         _unidades = unidades;
         _moradores = moradores;
         _credenciais = credenciais;
@@ -47,7 +52,7 @@ public sealed class MoradorServico : IMoradorServico
         Guid proprietarioId, Guid unidadeId, CriarMoradorRequest request, CancellationToken cancellationToken)
     {
         var unidade = await _unidades.GetByIdAsync(unidadeId, cancellationToken).ConfigureAwait(false);
-        if (unidade is null || unidade.Propriedade is null || unidade.Propriedade.ProprietarioId != proprietarioId)
+        if (unidade is null || unidade.Propriedade is null || !_acesso.Pode(proprietarioId, unidade.Propriedade, NivelAcesso.Alterar))
         {
             return Result<MoradorResponse>.Fail("Unidade não encontrada.");
         }
@@ -61,6 +66,8 @@ public sealed class MoradorServico : IMoradorServico
             Email = NullIfBlank(request.Email),
             Documento = NullIfBlank(request.Documento),
             Status = StatusMorador.Ativo,
+            Tipo = request.Tipo,
+            Parentesco = request.Tipo == TipoMorador.Dependente ? request.Parentesco : null,
             Observacoes = NullIfBlank(request.Observacoes),
             CreatedAtUtc = DateTime.UtcNow,
         };
@@ -75,7 +82,7 @@ public sealed class MoradorServico : IMoradorServico
         Guid proprietarioId, Guid unidadeId, CancellationToken cancellationToken)
     {
         var unidade = await _unidades.GetByIdAsync(unidadeId, cancellationToken).ConfigureAwait(false);
-        if (unidade is null || unidade.Propriedade is null || unidade.Propriedade.ProprietarioId != proprietarioId)
+        if (unidade is null || unidade.Propriedade is null || !_acesso.Pode(proprietarioId, unidade.Propriedade, NivelAcesso.Ver))
         {
             return Result<IReadOnlyList<MoradorResponse>>.Fail("Unidade não encontrada.");
         }
@@ -98,6 +105,8 @@ public sealed class MoradorServico : IMoradorServico
         morador.Email = NullIfBlank(request.Email);
         morador.Documento = NullIfBlank(request.Documento);
         morador.Status = request.Status;
+        morador.Tipo = request.Tipo;
+        morador.Parentesco = request.Tipo == TipoMorador.Dependente ? request.Parentesco : null;
         morador.Observacoes = NullIfBlank(request.Observacoes);
         await _moradores.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
@@ -187,8 +196,8 @@ public sealed class MoradorServico : IMoradorServico
     // Mesma mensagem para "nao existe" e "existe mas nao e do usuario" (padrao ja
     // usado em PropriedadeServico/UnidadeServico) — nao revela para o cliente que um
     // morador de outro dono existe com este Id.
-    private static bool PertenceAo(Morador? morador, Guid proprietarioId) =>
-        morador is not null && morador.Unidade?.Propriedade is not null && morador.Unidade.Propriedade.ProprietarioId == proprietarioId;
+    private bool PertenceAo(Morador? morador, Guid proprietarioId, NivelAcesso nivel = NivelAcesso.Alterar) =>
+        morador is not null && morador.Unidade?.Propriedade is not null && _acesso.Pode(proprietarioId, morador.Unidade.Propriedade, nivel);
 
     private static string? NullIfBlank(string? valor) => string.IsNullOrWhiteSpace(valor) ? null : valor.Trim();
 
@@ -202,6 +211,9 @@ public sealed class MoradorServico : IMoradorServico
         Email = morador.Email,
         Documento = morador.Documento,
         Status = morador.Status,
+        Tipo = morador.Tipo,
+        Parentesco = morador.Parentesco,
+        TemFoto = !string.IsNullOrEmpty(morador.FotoPath),
         Observacoes = morador.Observacoes,
     };
 }
